@@ -79,7 +79,7 @@ trait GraphBehaviours[V <: Node] extends Matchers {
 
   val sampleGraphEdges = Map(1 -> Seq(2,3,4), 2 -> Seq(1), 3 -> Seq(4), 5 -> Seq(1, 10))
 
-  def verifyInOutEdges(graph: DirectedGraph[V], numNodes: Int,
+  def verifyInOutEdges(graph: DirectedGraph[V], nodes: Set[Int],
                        outEdges: Map[Int, Seq[Int]],
                        inEdges: Map[Int, Seq[Int]],
                        checkOrdering: Boolean = false): Unit = {
@@ -107,7 +107,11 @@ trait GraphBehaviours[V <: Node] extends Matchers {
       }
     }
 
-    correctNumberOfNodesAndEdges(graph, numNodes)
+    correctNumberOfNodesAndEdges(graph, nodes.size)
+
+    "have correct set of node ids" in {
+      graph.map(_.id).toSet shouldEqual nodes
+    }
 
     "have correct in and out edges" + (if (checkOrdering) " in correct order" else "") in {
       for (node <- graph) {
@@ -117,14 +121,16 @@ trait GraphBehaviours[V <: Node] extends Matchers {
     }
   }
 
-  // verify a graph constructed from a supplied map of node id -> array of edges (outedges unless
-  // OnlyIn direction is to be stored in which case the supplied edges are incoming edges)
+  // verify a graph constructed from a supplied map of node id -> array of edges
+  // If the stored graph dir is InDir -> edges are incoming edges
+  // In all other cases, edges are considered outgoing edges
   def verifyGraphBuilding(builder: (Iterable[NodeIdEdgesMaxId], StoredGraphDir) => DirectedGraph[V],
                   givenEdges: Map[Int, Seq[Int]]): Unit =
   {
     def cross(k: Int, s: Seq[Int]) = for (e <- s) yield (e, k)
 
-    val allIds: Set[Int] = givenEdges.keys.toSet ++ givenEdges.values.toSet.flatMap { x: Seq[Int] => x }
+    val allIds: Set[Int] = givenEdges.keys.toSet ++
+        givenEdges.values.toSet.flatMap { x: Seq[Int] => x }
     val noEdges = Map.empty[Int, Seq[Int]]
     def iterableSeq = givenEdges map { case (k, s) => NodeIdEdgesMaxId(k, s.toArray) }
     for (dir <- List(StoredGraphDir.BothInOut, StoredGraphDir.OnlyOut, StoredGraphDir.OnlyIn)) {
@@ -134,9 +140,11 @@ trait GraphBehaviours[V <: Node] extends Matchers {
           case StoredGraphDir.OnlyIn => givenEdges
           case StoredGraphDir.OnlyOut => noEdges
           case StoredGraphDir.BothInOut =>
-            givenEdges.toArray flatMap { case (k, s) => cross(k, s) } groupBy(_._1) mapValues {_.map(_._2) }
+            val outEdgesDstSrc = givenEdges.toArray flatMap { case (k, s) => cross(k, s) }
+            outEdgesDstSrc.groupBy(_._1).mapValues {_.map(_._2) }
         }
-        verifyInOutEdges(graph, allIds.size,
+        val nodesInGraph = if (dir == StoredGraphDir.BothInOut) allIds else givenEdges.keySet
+        verifyInOutEdges(graph, nodesInGraph,
           if (dir == StoredGraphDir.OnlyIn) noEdges else givenEdges, inEdges)
       }
     }

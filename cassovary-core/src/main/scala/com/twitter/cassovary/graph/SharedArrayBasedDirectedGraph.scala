@@ -254,15 +254,18 @@ object SharedArrayBasedDirectedGraph {
 class SharedArrayBasedDirectedGraph private (nodeIdSet: Array[Byte], offsetTable: Array[Int],
     lengthTable: Array[Int], sharedEdgeArray: Array[Array[Int]],
     reverseDirEdgeArray: Option[Array[Array[Int]]], maxId: Int, val nodeWithOutEdgesMaxId: Int,
-    val nodeWithOutEdgesCount: Int, val nodeCount: Int, val edgeCount: Long,
+    val nodeWithOutEdgesCount: Int, val totalNodeCount: Int, val edgeCount: Long,
     val storedGraphDir: StoredGraphDir) extends DirectedGraph[Node] {
 
   override lazy val maxNodeId = maxId
 
   def iterator = (0 to maxId).flatMap(getNodeById(_)).iterator
 
+  lazy val nodeCount = if (storedGraphDir == BothInOut) totalNodeCount else nodeWithOutEdgesCount
+
   def getNodeById(id: Int) = {
-    if ((id < 0) || (id >= nodeIdSet.size) || (nodeIdSet(id) == 0)) {
+    if ((id < 0) || (id >= nodeIdSet.size) || (nodeIdSet(id) == 0) ||
+        ((lengthTable(id) == 0) && (storedGraphDir != BothInOut))) {
       None
     } else {
       val reverseEdges = reverseDirEdgeArray match {

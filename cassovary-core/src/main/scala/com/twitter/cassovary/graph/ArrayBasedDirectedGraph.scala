@@ -23,7 +23,6 @@ import com.twitter.finagle.stats.DefaultStatsReceiver
 import com.twitter.logging.Logger
 import com.twitter.util.Future.when
 import com.twitter.util.{Await, Future, FuturePool}
-
 import scala.collection.mutable
 
 /**
@@ -124,15 +123,16 @@ object ArrayBasedDirectedGraph {
       val result: Future[ArrayBasedDirectedGraph] = for {
         (nodesOutEdges, maxNodeId, nodeWithOutEdgesMaxId) <- fillOutEdges(iterableSeq, storedGraphDir)
         (table, nodeIdSet) <- markStoredNodes(nodesOutEdges, maxNodeId, storedGraphDir)
-        NodesWithNoOutEdgesAndGraphStats(nodesWithNoOutEdges, nodeWithOutEdgesCount, numEdges, numNodes) =
+        NodesWithNoOutEdgesAndGraphStats(nodesWithNoOutEdges, nodeWithOutEdgesCount, numEdges) =
         createNodesWithNoOutEdges(table, nodeIdSet, maxNodeId, storedGraphDir)
         _ <- when(storedGraphDir == StoredGraphDir.BothInOut) {
           fillMissingInEdges(table, nodesOutEdges, nodesWithNoOutEdges, nodeIdSet, maxNodeId)
         }
-      } yield
-        new ArrayBasedDirectedGraph(table.asInstanceOf[Array[Node]], maxNodeId,
-          nodeWithOutEdgesMaxId, nodeWithOutEdgesCount, numNodes, numEdges, storedGraphDir)
-
+      } yield {
+        val nodes = table.asInstanceOf[Array[Node]]
+        new ArrayBasedDirectedGraph(nodes, maxNodeId,
+          nodeWithOutEdgesMaxId, nodeWithOutEdgesCount, numEdges, storedGraphDir)
+      }
       Await.result(result)
     }
 
@@ -235,8 +235,7 @@ object ArrayBasedDirectedGraph {
     case class NodesWithNoOutEdgesAndGraphStats(
       nodesWithNoOutEdges: mutable.ArrayBuffer[Node],
       nodeWithOutEdgesCount: Int,
-      numEdges: Long,
-      numNodes: Int
+      numEdges: Long
     )
 
     /**
@@ -250,18 +249,17 @@ object ArrayBasedDirectedGraph {
       val nodesWithNoOutEdges = new mutable.ArrayBuffer[Node]()
       var nodeWithOutEdgesCount = 0
       var numEdges = 0L
-      var numNodes = 0
       log.debug("creating nodes that have only in-coming edges")
       statsReceiver.time("graph_load_creating_nodes_without_out_edges") {
         for (id <- 0 to maxNodeId) {
           if (nodeIdSet(id) == 1) {
-            numNodes += 1
             if (table(id) == null) {
-              val node = ArrayBasedDirectedNode(id, emptyArray, storedGraphDir,
-                neighborsSortingStrategy != LeaveUnsorted)
-              table(id) = node
-              if (storedGraphDir == StoredGraphDir.BothInOut)
+              if (storedGraphDir == StoredGraphDir.BothInOut) {
+                val node = ArrayBasedDirectedNode(id, emptyArray, storedGraphDir,
+                  neighborsSortingStrategy != LeaveUnsorted)
+                table(id) = node
                 nodesWithNoOutEdges += node
+              }
             } else {
               nodeWithOutEdgesCount += 1
               storedGraphDir match {
@@ -274,7 +272,7 @@ object ArrayBasedDirectedGraph {
           }
         }
       }
-      NodesWithNoOutEdgesAndGraphStats(nodesWithNoOutEdges, nodeWithOutEdgesCount, numEdges, numNodes)
+      NodesWithNoOutEdgesAndGraphStats(nodesWithNoOutEdges, nodeWithOutEdgesCount, numEdges)
     }
 
     /**
@@ -283,7 +281,7 @@ object ArrayBasedDirectedGraph {
      * @return Future of unit that is completed, when all missing in edges are filled in nodes from the `table`.
      */
     private def fillMissingInEdges(table: Array[Node], nodesOutEdges: Seq[Seq[Node]],
-                                   nodesWithNoOutEdges: Seq[Node], nodeIdSet: Array[Byte], numNodes: Int):
+        nodesWithNoOutEdges: Seq[Node], nodeIdSet: Array[Byte], maxNodeId: Int):
     Future[Unit] = {
       log.debug("calculating in edges sizes")
 
@@ -340,7 +338,7 @@ object ArrayBasedDirectedGraph {
       }
 
       for {
-        inEdgesSizes <- findInEdgesSizes(nodesOutEdges, nodeIdSet, numNodes)
+        inEdgesSizes <- findInEdgesSizes(nodesOutEdges, nodeIdSet, maxNodeId)
         _ <- instantiateInEdges(inEdgesSizes)
         _ <- populateInEdges(inEdgesSizes)
         _ <- when(neighborsSortingStrategy != LeaveUnsorted) (finishInEdgesFilling())
@@ -388,12 +386,14 @@ object ArrayBasedDirectedGraph {
  */
 class ArrayBasedDirectedGraph private (nodes: Array[Node], maxId: Int,
                               val nodeWithOutEdgesMaxId: Int,
-                              val nodeWithOutEdgesCount: Int, val nodeCount: Int, val edgeCount: Long,
+                              val nodeWithOutEdgesCount: Int, val edgeCount: Long,
                               val storedGraphDir: StoredGraphDir) extends DirectedGraph[Node] {
 
   override lazy val maxNodeId = maxId
 
   def iterator = nodes.iterator.filter (_ != null)
+
+  lazy val nodeCount = nodes.count(_ != null)
 
   def getNodeById(id: Int) = {
     if ( (id < 0) || (id >= nodes.size)) {
