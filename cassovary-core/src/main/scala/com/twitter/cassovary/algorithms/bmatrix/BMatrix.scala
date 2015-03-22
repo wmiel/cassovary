@@ -13,9 +13,13 @@
  */
 package com.twitter.cassovary.algorithms.bmatrix
 
+import java.util
+
 import com.twitter.cassovary.graph._
 import com.twitter.cassovary.util.Progress
-import com.twitter.logging.{Level, Logger}
+import com.twitter.logging.Logger
+import it.unimi.dsi.fastutil.ints.{Int2IntMap, Int2IntOpenHashMap}
+import java.{util => jutil}
 
 object BMatrix {
 
@@ -23,7 +27,26 @@ object BMatrix {
     val bm = new BMatrix(graph)
     bm.run
   }
+}
 
+private class DepthsCounter {
+  protected val underlyingMap = new Int2IntOpenHashMap
+
+  def incrementForDepth(degree: Int) = {
+    underlyingMap.addTo(degree, 1)
+  }
+
+  def addToWriter(writer: BMatrixWriter) = {
+    val iterator = counters.entrySet().iterator()
+    while (iterator.hasNext) {
+      val entry = iterator.next
+      writer.synchronized {
+        writer.add(entry.getKey, entry.getValue)
+      }
+    }
+  }
+
+  def counters = underlyingMap
 }
 
 private class BMatrix(graph: DirectedGraph[Node]) {
@@ -33,7 +56,7 @@ private class BMatrix(graph: DirectedGraph[Node]) {
   def setDebug() = {
     val topLog = Logger.get("")
     topLog.setLevel(Logger.DEBUG)
-    topLog.getHandlers().foreach( handler => handler.setLevel(Logger.DEBUG) )
+    topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
   def run: Unit = {
@@ -42,21 +65,21 @@ private class BMatrix(graph: DirectedGraph[Node]) {
       log.info("Warning - you may be able to reduce the memory usage of PageRank by renumbering this graph!")
 
     log.info("Initializing starting BMatix calculation...")
-    val progress = Progress("BMatrix_calculation", 100, Some(graph.nodeCount))
+    val progress = Progress("BMatrix_calculation", 5000, Some(graph.nodeCount))
     val writer = new BMatrixWriter()
 
     setDebug()
 
-    graph.foreach { node =>
+    graph.par.foreach { node =>
       val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
+      val depthCounters = new DepthsCounter
 
-      bfs.toList
-      bfs.depthAllNodes().values.toTraversable.groupBy(k => k).map(k => {
-        k._1 -> k._2.size
-      }).foreach(k => {
-        if (k._1 > 0)
-          writer.add(k._1, k._2)
+      bfs.foreach(x => {})
+      bfs.depthAllNodes().values.foreach(depth => {
+        if (depth > 0)
+          depthCounters.incrementForDepth(depth)
       })
+      depthCounters.addToWriter(writer)
       progress.inc
     }
     log.info("Printing matrix")

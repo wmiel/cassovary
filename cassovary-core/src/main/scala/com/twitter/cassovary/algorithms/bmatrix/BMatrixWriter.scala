@@ -11,7 +11,7 @@ class BMatrixWriter {
   }
 
   private def increment(map: Int2IntOpenHashMap, k: Int) = {
-      map.addTo(k, 1)
+    map.addTo(k, 1)
   }
 
   private def getOrCreate(l: Int): Int2IntOpenHashMap = {
@@ -26,14 +26,17 @@ class BMatrixWriter {
 
   def printMatrix() = {
     val watch = Stopwatch.start()
+    println("#B-Matrix START")
+    println("#l-shell size\tnumber of members in l-shell\tnumber of nodes")
     val keys = underlyingMap.keySet().toIntArray.sorted
-    keys.foreach( key => {
+    keys.foreach(key => {
       val map = underlyingMap.get(key)
       val keys2 = map.keySet().toIntArray.sorted
-      keys2.foreach( key2 => {
-        printf("[%d,%d] = %d\n", key, key2, map.get(key2))
+      keys2.foreach(key2 => {
+        printf("%d\t%d\t%d\n", key, key2, map.get(key2))
       })
     })
+    println("#B-Matrix END")
     printf("\tPrinting time: %s.\n", watch())
   }
 
