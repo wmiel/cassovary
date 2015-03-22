@@ -48,18 +48,14 @@ private class BMatrix(graph: DirectedGraph[Node]) {
     setDebug()
 
     graph.foreach { node =>
-      log.trace("VISITED:" + node.id.toString)
       val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-      //      bfs.foreach(visited_node => {
-      //        writer.add()
-      //        printf("Nei: %d\t%d\n", visited_node.id, bfs.depth(visited_node.id).getOrElse(-1))
-      //      })
-      bfs.map(visited_node => {
-        bfs.depth(visited_node.id).getOrElse(-1)
-      }).filter(k => k > 0).toTraversable.groupBy(k => k).map(k => {
+
+      bfs.toList
+      bfs.depthAllNodes().values.toTraversable.groupBy(k => k).map(k => {
         k._1 -> k._2.size
       }).foreach(k => {
-        writer.add(k._1, k._2)
+        if (k._1 > 0)
+          writer.add(k._1, k._2)
       })
       progress.inc
     }

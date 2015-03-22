@@ -11,8 +11,7 @@ class BMatrixWriter {
   }
 
   private def increment(map: Int2IntOpenHashMap, k: Int) = {
-    val current = map.get(k)
-    map.put(k, current + 1)
+      map.addTo(k, 1)
   }
 
   private def getOrCreate(l: Int): Int2IntOpenHashMap = {
