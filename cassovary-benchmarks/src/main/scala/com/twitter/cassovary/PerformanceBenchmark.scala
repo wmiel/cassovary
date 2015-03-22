@@ -89,6 +89,8 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val getNodeFlag = flags("gn", 0, "run getNodeById benchmark with a given number of steps")
   val reps = flags("reps", DEFAULT_REPS, "number of times to run benchmark")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
+  val bmatrixFlag = flags("bmatrix", false, "run bmatrix benchmark")
+
   flags.parseArgs(args)
   if (localFileFlag.isDefined) files += ((SMALL_FILES_DIRECTORY, localFileFlag()))
   if (remoteFileFlag.isDefined) files += cacheRemoteFile(remoteFileFlag())
@@ -98,15 +100,19 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   }
   if (globalPRFlag()) { benchmarks += (g => new PageRankBenchmark(g)) }
   if (pprFlag()) { benchmarks += (g => new PersonalizedPageRankBenchmark(g)) }
+  if (bmatrixFlag()) { benchmarks += (g => new BMatrixBenchmark(g)) }
 
-  centFlag() match {
-    case "indegree"  => benchmarks += (g => new InDegreeCentralityBenchmark(g))
-    case "outdegree" => benchmarks += (g => new OutDegreeCentralityBenchmark(g))
-    case "closeness" => benchmarks += (g => new ClosenessCentralityBenchmark(g))
-    case "all"       => benchmarks.append(g => new InDegreeCentralityBenchmark(g),
-      g => new OutDegreeCentralityBenchmark(g), g => new ClosenessCentralityBenchmark(g))
-    case s: String => printf("%s is not a valid centrality option.  Please use indegree, outdegree, or closeness.\n", s)
+  if (centFlag.isDefined) {
+    centFlag() match {
+      case "indegree" => benchmarks += (g => new InDegreeCentralityBenchmark(g))
+      case "outdegree" => benchmarks += (g => new OutDegreeCentralityBenchmark(g))
+      case "closeness" => benchmarks += (g => new ClosenessCentralityBenchmark(g))
+      case "all" => benchmarks.append(g => new InDegreeCentralityBenchmark(g),
+        g => new OutDegreeCentralityBenchmark(g), g => new ClosenessCentralityBenchmark(g))
+      case s: String => printf("%s is not a valid centrality option.  Please use indegree, outdegree, or closeness.\n", s)
+    }
   }
+
 
   if (getNodeFlag() > 0) { benchmarks += (g => new GetNodeByIdBenchmark(g, getNodeFlag(),
     GraphDir.OutDir))}
