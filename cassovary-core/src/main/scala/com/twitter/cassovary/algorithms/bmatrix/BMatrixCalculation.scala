@@ -18,25 +18,34 @@ import java.util
 import com.twitter.cassovary.graph._
 import com.twitter.cassovary.util.Progress
 import com.twitter.logging.Logger
+import com.twitter.util.Stopwatch
 import it.unimi.dsi.fastutil.ints.{Int2IntMap, Int2IntOpenHashMap}
 import java.{util => jutil}
 
-object BMatrix {
+object BMatrixCalculation {
 
-  def apply(graph: DirectedGraph[Node]): Unit = {
-    val bm = new BMatrix(graph)
-    bm.run
+  def apply(graph: DirectedGraph[Node], filename: String): Unit = {
+    val bm = new BMatrixCalculation(graph)
+    bm.run(filename)
   }
 }
 
-private class DepthsCounter {
+private class DepthsProcessor(writer: BMatrixWriter) {
   protected val underlyingMap = new Int2IntOpenHashMap
 
   def incrementForDepth(degree: Int) = {
     underlyingMap.addTo(degree, 1)
   }
 
-  def addToWriter(writer: BMatrixWriter) = {
+  def processDepths(depths: collection.Map[Int, Int]) = {
+    depths.values.foreach(depth => {
+      if (depth > 0)
+        incrementForDepth(depth)
+    })
+    addToWriter
+  }
+
+  private def addToWriter() = {
     val iterator = counters.entrySet().iterator()
     while (iterator.hasNext) {
       val entry = iterator.next
@@ -49,9 +58,9 @@ private class DepthsCounter {
   def counters = underlyingMap
 }
 
-private class BMatrix(graph: DirectedGraph[Node]) {
+private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
-  private val log = Logger.get("BMatrix")
+  private val log = Logger.get("BMatrixCalculation")
 
   def setDebug() = {
     val topLog = Logger.get("")
@@ -59,32 +68,41 @@ private class BMatrix(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run: Unit = {
+  def run(OutFileNamePrefix: String): Unit = {
     // Let the user know if they can save memory!
     if (graph.maxNodeId.toDouble / graph.nodeCount > 1.1 && graph.maxNodeId - graph.nodeCount > 1000000)
       log.info("Warning - you may be able to reduce the memory usage of PageRank by renumbering this graph!")
 
-    log.info("Initializing starting BMatix calculation...")
     val progress = Progress("BMatrix_calculation", 5000, Some(graph.nodeCount))
-    val writer = new BMatrixWriter()
-
     setDebug()
+
+
+    log.info("Initializing BMatix calculation...\n")
+    val watch = Stopwatch.start()
+    val writer = new BMatrixWriter()
 
     graph.par.foreach { node =>
       val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-      val depthCounters = new DepthsCounter
-
+      val depthCounters = new DepthsProcessor(writer)
+      //We traverse the graph to get depths
       bfs.foreach(x => {})
-      bfs.depthAllNodes().values.foreach(depth => {
-        if (depth > 0)
-          depthCounters.incrementForDepth(depth)
-      })
-      depthCounters.addToWriter(writer)
+
+      depthCounters.processDepths(bfs.depthAllNodes())
+
+      //Should be synchronized, but we don't care that much, it's just for debug.
       progress.inc
     }
-    log.info("Printing matrix")
+    log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
+
+    log.info("Initializing BMatrix writing\n")
+    val writingWatch = Stopwatch.start()
     writer.printMatrix()
-    log.info("END")
+    log.info("Finished BMatrix writing time: %s\n".format(writingWatch()))
+    log.info("Initializing BMatrix writing\n")
+    val writingWatch2 = Stopwatch.start()
+    writer.writeMatrix(OutFileNamePrefix)
+    log.info("Finished BMatrix writing time: %s\n".format(writingWatch2()))
+
   }
 }
 

@@ -89,7 +89,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val getNodeFlag = flags("gn", 0, "run getNodeById benchmark with a given number of steps")
   val reps = flags("reps", DEFAULT_REPS, "number of times to run benchmark")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
-  val bmatrixFlag = flags("bmatrix", false, "run bmatrix benchmark")
+  val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
   val undirectedFlag = flags("undirected", false, "treat graph as undirected")
 
   flags.parseArgs(args)
@@ -101,7 +101,14 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   }
   if (globalPRFlag()) { benchmarks += (g => new PageRankBenchmark(g)) }
   if (pprFlag()) { benchmarks += (g => new PersonalizedPageRankBenchmark(g)) }
-  if (bmatrixFlag()) { benchmarks += (g => new BMatrixBenchmark(g)) }
+  if (bMatrixFlag.isDefined) {
+    bMatrixFlag() match {
+      case "" => {}
+      case s: String => {
+        benchmarks += (g => new BMatrixBenchmark(g, s))
+      }
+    }
+  }
 
   if (centFlag.isDefined) {
     centFlag() match {

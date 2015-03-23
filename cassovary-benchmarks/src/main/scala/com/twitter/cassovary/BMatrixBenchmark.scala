@@ -13,14 +13,15 @@
  */
 package com.twitter.cassovary
 
-import com.twitter.cassovary.algorithms.bmatrix.BMatrix
+import com.twitter.cassovary.algorithms.bmatrix.{BMatrixWriter, BMatrixCalculation}
 import com.twitter.cassovary.graph.{DirectedGraph, Node}
+import com.twitter.util.Stopwatch
 
 
-class BMatrixBenchmark(graph: DirectedGraph[Node])
+class BMatrixBenchmark(graph: DirectedGraph[Node], outFileNamePrefix:String)
   extends OperationBenchmark {
 
   def operation() {
-    BMatrix(graph)
+    BMatrixCalculation(graph, outFileNamePrefix)
   }
 }

@@ -1,12 +1,11 @@
 package com.twitter.cassovary.algorithms.bmatrix
 
-import com.twitter.util.Stopwatch
 import it.unimi.dsi.fastutil.ints.{Int2IntOpenHashMap, Int2ObjectOpenHashMap}
 
-class BMatrixWriter {
-  protected val underlyingMap = new Int2ObjectOpenHashMap[Int2IntOpenHashMap];
+class BMatrixWriter extends FileWriter {
+  protected val underlyingMap = new Int2ObjectOpenHashMap[Int2IntOpenHashMap]
 
-  def add(l: Int, k: Int): Unit = {
+  def add(l: Int, k: Int) = {
     increment(getOrCreate(l), k)
   }
 
@@ -24,20 +23,31 @@ class BMatrixWriter {
     }
   }
 
-  def printMatrix() = {
-    val watch = Stopwatch.start()
-    println("#B-Matrix START")
-    println("#l-shell size\tnumber of members in l-shell\tnumber of nodes")
+  def entries(func: String => Unit) = {
+    func("#l-shell size\tnumber of members in l-shell\tnumber of nodes")
+    func("#B-Matrix START\n")
+
     val keys = underlyingMap.keySet().toIntArray.sorted
     keys.foreach(key => {
       val map = underlyingMap.get(key)
       val keys2 = map.keySet().toIntArray.sorted
       keys2.foreach(key2 => {
-        printf("%d\t%d\t%d\n", key, key2, map.get(key2))
+        func("%d\t%d\t%d\n".format(key, key2, map.get(key2)))
       })
     })
-    println("#B-Matrix END")
-    printf("\tPrinting time: %s.\n", watch())
+
+    func("#B-Matrix END")
   }
 
+  def filename(OutFileNamePrefix: String) = {
+    OutFileNamePrefix + "_bmatrix.out"
+  }
+
+  def printMatrix() = {
+    writeToStdout(entries)
+  }
+
+  def writeMatrix(OutFileNamePrefix: String) = {
+    writeToFile(filename(OutFileNamePrefix), entries)
+  }
 }
