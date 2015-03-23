@@ -58,7 +58,8 @@ class ListOfEdgesGraphReader[T](
   val directory: String,
   override val prefixFileNames: String,
   val nodeNumberer: NodeNumberer[T],
-  idReader: (String => T)
+  idReader: (String => T),
+  val directed:Boolean = true
 ) extends GraphReaderFromDirectory[T] {
 
   private lazy val log = Logger.get
@@ -92,19 +93,27 @@ class ListOfEdgesGraphReader[T](
           }
         }
 
+        def processEdge(from: String, to: String): Unit = {
+          val internalFromId = nodeNumberer.externalToInternal(idReader(from))
+          val internalToId = nodeNumberer.externalToInternal(idReader(to))
+          if (edgesBySource.containsKey(internalFromId)) {
+            edgesBySource.get(internalFromId) += internalToId
+          } else {
+            edgesBySource.put(internalFromId, ArrayBuffer(internalToId))
+          }
+          updateNodeMaxOutEdgeId(internalFromId, internalToId)
+        }
+
         lines.foreach {
           line =>
             line.trim match {
               case commentPattern(s) => ()
-              case directedEdgePattern(from, to) =>
-                val internalFromId = nodeNumberer.externalToInternal(idReader(from))
-                val internalToId = nodeNumberer.externalToInternal(idReader(to))
-                if (edgesBySource.containsKey(internalFromId)) {
-                  edgesBySource.get(internalFromId) += internalToId
-                } else {
-                  edgesBySource.put(internalFromId, ArrayBuffer(internalToId))
+              case directedEdgePattern(from, to) => {
+                processEdge(from, to)
+                if(!directed) {
+                  processEdge(to, from)
                 }
-                updateNodeMaxOutEdgeId(internalFromId, internalToId)
+              }
             }
         }
         log.info("Finished reading from file %s...\n", filename)
@@ -143,6 +152,12 @@ object ListOfEdgesGraphReader {
   def forIntIds(directory: String, prefixFileNames: String = "", threadPool: ExecutorService,
                 nodeNumberer: NodeNumberer[Int] = new NodeNumberer.IntIdentity()) =
     new ListOfEdgesGraphReader[Int](directory, prefixFileNames, new NodeNumberer.IntIdentity(), _.toInt) {
+      override val executorService = threadPool
+    }
+
+  def forIntIdsUndirected(directory: String, prefixFileNames: String = "", threadPool: ExecutorService,
+                nodeNumberer: NodeNumberer[Int] = new NodeNumberer.IntIdentity()) =
+    new ListOfEdgesGraphReader[Int](directory, prefixFileNames, new NodeNumberer.IntIdentity(), _.toInt, false) {
       override val executorService = threadPool
     }
 }

@@ -90,6 +90,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val reps = flags("reps", DEFAULT_REPS, "number of times to run benchmark")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bmatrixFlag = flags("bmatrix", false, "run bmatrix benchmark")
+  val undirectedFlag = flags("undirected", false, "treat graph as undirected")
 
   flags.parseArgs(args)
   if (localFileFlag.isDefined) files += ((SMALL_FILES_DIRECTORY, localFileFlag()))
@@ -128,7 +129,10 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
       if (adjacencyList) {
         AdjacencyListGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
       } else
-        ListOfEdgesGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+        if(undirectedFlag())
+          ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+        else
+          ListOfEdgesGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
     }
 
     if (benchmarks.isEmpty) {
