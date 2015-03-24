@@ -30,27 +30,37 @@ object BMatrixCalculation {
   }
 }
 
-private class DepthsProcessor(writer: BMatrixWriter) {
+private class DepthsProcessor(bMatrixWriter: BMatrixWriter, distanceMatrixWriter: DistanceMatrixWriter) {
   protected val underlyingMap = new Int2IntOpenHashMap
 
   def incrementForDepth(degree: Int) = {
     underlyingMap.addTo(degree, 1)
   }
 
-  def processDepths(depths: collection.Map[Int, Int]) = {
-    depths.values.foreach(depth => {
-      if (depth > 0)
+  def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
+    val array = distanceMatrixWriter.getNewArray
+    depths.foreach(key_val => {
+      val nodeId = key_val._1
+      val depth = key_val._2
+
+      if (depth > 0) {
         incrementForDepth(depth)
+        array(nodeId) = depth
+      }
     })
-    addToWriter
+    distanceMatrixWriter.putArray(nodeId, array)
+    distanceMatrixWriter.synchronized {
+      distanceMatrixWriter.lineReady(nodeId)
+    }
+    addToBMatrixWriter()
   }
 
-  private def addToWriter() = {
-    val iterator = counters.entrySet().iterator()
+  private def addToBMatrixWriter() = {
+    val iterator = counters.int2IntEntrySet().iterator()
     while (iterator.hasNext) {
       val entry = iterator.next
-      writer.synchronized {
-        writer.add(entry.getKey, entry.getValue)
+      bMatrixWriter.synchronized {
+        bMatrixWriter.add(entry.getKey, entry.getValue)
       }
     }
   }
@@ -68,9 +78,9 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run(OutFileNamePrefix: String): Unit = {
+  def run(outFileNamePrefix: String): Unit = {
     // Let the user know if they can save memory!
-    if (graph.maxNodeId.toDouble / graph.nodeCount > 1.1 && graph.maxNodeId - graph.nodeCount > 1000000)
+    if (graph.maxNodeId.toDouble != graph.nodeCount)
       log.info("Warning - you may be able to reduce the memory usage of PageRank by renumbering this graph!")
 
     val progress = Progress("BMatrix_calculation", 5000, Some(graph.nodeCount))
@@ -79,28 +89,30 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
     log.info("Initializing BMatix calculation...\n")
     val watch = Stopwatch.start()
-    val writer = new BMatrixWriter()
+    val bMatrixWriter = new BMatrixWriter()
+    val distanceMatrixWriter = new DistanceMatrixWriter(graph, outFileNamePrefix)
 
     graph.par.foreach { node =>
       val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-      val depthCounters = new DepthsProcessor(writer)
+      val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
       //We traverse the graph to get depths
       bfs.foreach(x => {})
 
-      depthCounters.processDepths(bfs.depthAllNodes())
+      depthProcessor.processDepths(node.id, bfs.depthAllNodes())
 
       //Should be synchronized, but we don't care that much, it's just for debug.
       progress.inc
     }
+    distanceMatrixWriter.close()
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
 
     log.info("Initializing BMatrix writing\n")
     val writingWatch = Stopwatch.start()
-    writer.printMatrix()
+    bMatrixWriter.printMatrix()
     log.info("Finished BMatrix writing time: %s\n".format(writingWatch()))
     log.info("Initializing BMatrix writing\n")
     val writingWatch2 = Stopwatch.start()
-    writer.writeMatrix(OutFileNamePrefix)
+    bMatrixWriter.writeMatrix(outFileNamePrefix)
     log.info("Finished BMatrix writing time: %s\n".format(writingWatch2()))
 
   }

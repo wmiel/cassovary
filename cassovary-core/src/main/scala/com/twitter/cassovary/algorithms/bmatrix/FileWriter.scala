@@ -4,9 +4,6 @@ import java.io.FileOutputStream
 
 import it.unimi.dsi.fastutil.io.FastBufferedOutputStream
 
-/**
- * Created by Wojtek on 3/23/15.
- */
 trait FileWriter {
   def writeToStdout(entries: ((String) => Unit) => Unit) = {
     entries((x: String) => print(x))
