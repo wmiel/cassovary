@@ -18,10 +18,10 @@ import com.twitter.cassovary.graph.{DirectedGraph, Node}
 import com.twitter.util.Stopwatch
 
 
-class BMatrixBenchmark(graph: DirectedGraph[Node], outFileNamePrefix:String)
+class BMatrixBenchmark(graph: DirectedGraph[Node], outFileNamePrefix: String, writeDistanceMatrix: Boolean, threads: Int)
   extends OperationBenchmark {
 
   def operation() {
-    BMatrixCalculation(graph, outFileNamePrefix)
+    BMatrixCalculation(graph, outFileNamePrefix, writeDistanceMatrix, threads)
   }
 }

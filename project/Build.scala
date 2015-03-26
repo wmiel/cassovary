@@ -1,7 +1,7 @@
 import sbt._
 import Keys._
 import xerial.sbt.Sonatype._
-
+import xerial.sbt.Pack._
 
 object Cassovary extends Build {
 
@@ -41,6 +41,7 @@ object Cassovary extends Build {
     javaOptions in run ++= Seq("-server"),
     outputStrategy := Some(StdoutOutput),
 
+
     // Sonatype publishing
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
@@ -77,7 +78,7 @@ object Cassovary extends Build {
       else
         Some("releases"  at nexus + "service/local/staging/deploy/maven2")
     }
-  )
+  ) ++ packAutoSettings
 
   lazy val root = Project(
     id = "cassovary",

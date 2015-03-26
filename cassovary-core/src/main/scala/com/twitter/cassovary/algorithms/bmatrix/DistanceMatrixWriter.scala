@@ -1,21 +1,50 @@
 package com.twitter.cassovary.algorithms.bmatrix
 
 import java.io.FileOutputStream
+import java.nio.{ByteBuffer, IntBuffer}
+import java.util
+import java.util.concurrent.ConcurrentHashMap
 
 import com.twitter.cassovary.graph._
 import it.unimi.dsi.fastutil.ints.{Int2BooleanOpenHashMap, Int2ObjectOpenHashMap}
 import it.unimi.dsi.fastutil.io.FastBufferedOutputStream
 
-class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String) {
-  protected val underlyingMap = new Int2ObjectOpenHashMap[Array[Int]]
+trait MatrixWriter {
+
+  def writeNodesNumber()
+  def getNewBuffer: ByteBuffer
+  def putInBuffer(byteBuffer: ByteBuffer, nodeId: Int, value: Int)
+  def putBuffer(nodeId: Int, buffer: ByteBuffer)
+  def lineReady(nodeId: Int)
+  def close()
+}
+
+class NullDistanceMatrixWriter extends MatrixWriter {
+  override def writeNodesNumber(): Unit = {}
+
+  override def lineReady(nodeId: Int): Unit = {}
+
+  override def putInBuffer(byteBuffer: ByteBuffer, nodeId: Int, value: Int): Unit = {}
+
+  override def close(): Unit = {}
+
+  override def putBuffer(nodeId: Int, buffer: ByteBuffer): Unit = {}
+
+  override def getNewBuffer: ByteBuffer = null
+}
+
+class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String) extends MatrixWriter {
+  protected val underlyingMap = new ConcurrentHashMap[Int, ByteBuffer]
   protected val missingNodeIds = new Int2BooleanOpenHashMap
+  private val offsets = new Array[Int](graph.maxNodeId + 1)
   private val fout = new FileOutputStream(filename(OutFileNamePrefix))
-  private val out = new FastBufferedOutputStream(fout)
-  private val tab = "\t".getBytes()
-  private val newline = "\n".getBytes()
+  private val out = fout.getChannel
+  private val tab = "\t".getBytes
+  private val newline = "\n".getBytes
   private val maxId = graph.maxNodeId
   private val nodesNumber = graph.nodeCount
   private var lastWrittenId = 0
+  private var lastLog = 0
 
   val nodeIds = 0 until maxId
   nodeIds.foreach(id => {
@@ -24,32 +53,64 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
     }
   })
 
-  def getNewArray: Array[Int] = {
-    new Array[Int](maxId + 1)
+  writeNodesNumber
+  prepareOffsets
+
+  def writeNodesNumber = {
+    val buffer = ByteBuffer.allocate(4)
+    buffer.putInt(nodesNumber)
+    buffer.rewind()
+    out.write(buffer)
   }
 
-  def putArray(nodeId: Int, array: Array[Int]) = {
-    underlyingMap.put(nodeId, array)
+  def prepareOffsets = {
+    var missing = 0
+    (0 until offsets.length).foreach { i =>
+      if(missingNodeIds.containsKey(i)) {
+        missing += 1
+      }
+      offsets(i) = missing
+    }
+  }
+
+  def getNewBuffer: ByteBuffer = {
+    val buffer = ByteBuffer.allocate(4 * nodesNumber)
+    buffer
+  }
+
+  def putInBuffer(byteBuffer: ByteBuffer, nodeId: Int, value: Int) = {
+    byteBuffer.putInt((nodeId - offsets(nodeId)) * 4, value)
+  }
+
+  def putBuffer(nodeId: Int, buffer: ByteBuffer) = {
+    printf("Put buffer: %d\n", nodeId)
+    underlyingMap.put(nodeId, buffer)
   }
 
   def lineReady(nodeId: Int) = {
+    //var chunkWrite = 0
+    //val writtenIds = new util.ArrayList[Int]
     while (underlyingMap.containsKey(lastWrittenId) || missingNodeIds.containsKey(lastWrittenId)) {
-      val arrayToWrite = underlyingMap.remove(lastWrittenId)
-      if (arrayToWrite != null) {
-        writeLine(arrayToWrite)
+      val bufferToWrite = underlyingMap.remove(lastWrittenId)
+      if (bufferToWrite != null) {
+        writeLine(bufferToWrite)
       }
+     //chunkWrite += 1
+      //writtenIds.add(lastWrittenId)
       lastWrittenId += 1
     }
+    //printf("Written in one chunk: %d, nodeId %d, written: %s\n", chunkWrite, nodeId, writtenIds.toString)
   }
 
-  private def writeLine(arrayToWrite: Array[Int]) = {
-    arrayToWrite.zipWithIndex foreach { case (el, i) =>
-      if (!missingNodeIds.containsKey(i)) {
-        out.write(el.toString.getBytes)
-        out.write(tab)
-      }
-    }
-    out.write(newline)
+  private def writeLine(buffer: ByteBuffer) = {
+    buffer.rewind()
+    //val range = 0 until nodesNumber
+    //range.foreach({x => println("aa" + x.toString()); println(buffer.getInt(x * 4))})
+    out.write(buffer)
+//    if(lastLog % 500 == 0) {
+//      printf("Last written line:%d, map size: %d \n", lastWrittenId, underlyingMap.size)
+//    }
+//    lastLog += 1
   }
 
   def filename(OutFileNamePrefix: String) = {
@@ -57,7 +118,6 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
   }
 
   def close() = {
-    out.flush()
     out.close()
     fout.close()
   }

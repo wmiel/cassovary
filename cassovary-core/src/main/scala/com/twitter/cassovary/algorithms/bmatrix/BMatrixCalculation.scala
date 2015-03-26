@@ -13,24 +13,26 @@
  */
 package com.twitter.cassovary.algorithms.bmatrix
 
-import java.util
+import java.util.concurrent.Executors
+import java.{util => jutil}
 
 import com.twitter.cassovary.graph._
 import com.twitter.cassovary.util.Progress
 import com.twitter.logging.Logger
 import com.twitter.util.Stopwatch
-import it.unimi.dsi.fastutil.ints.{Int2IntMap, Int2IntOpenHashMap}
-import java.{util => jutil}
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
+
+import scala.concurrent.ExecutionContext
 
 object BMatrixCalculation {
 
-  def apply(graph: DirectedGraph[Node], filename: String): Unit = {
+  def apply(graph: DirectedGraph[Node], filename: String, writeDistanceMatrix: Boolean, threads: Int): Unit = {
     val bm = new BMatrixCalculation(graph)
-    bm.run(filename)
+    bm.run(filename, writeDistanceMatrix, threads)
   }
 }
 
-private class DepthsProcessor(bMatrixWriter: BMatrixWriter, distanceMatrixWriter: DistanceMatrixWriter) {
+private class DepthsProcessor(bMatrixWriter: BMatrixWriter, distanceMatrixWriter: MatrixWriter) {
   protected val underlyingMap = new Int2IntOpenHashMap
 
   def incrementForDepth(degree: Int) = {
@@ -38,17 +40,19 @@ private class DepthsProcessor(bMatrixWriter: BMatrixWriter, distanceMatrixWriter
   }
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
-    val array = distanceMatrixWriter.getNewArray
+    val buffer = distanceMatrixWriter.getNewBuffer
     depths.foreach(key_val => {
-      val nodeId = key_val._1
+      val nId = key_val._1
       val depth = key_val._2
 
       if (depth > 0) {
         incrementForDepth(depth)
-        array(nodeId) = depth
+        distanceMatrixWriter.putInBuffer(buffer, nId, depth)
       }
     })
-    distanceMatrixWriter.putArray(nodeId, array)
+
+    //possible deadlock? Consider using concurrent hash map
+    distanceMatrixWriter.putBuffer(nodeId, buffer)
     distanceMatrixWriter.synchronized {
       distanceMatrixWriter.lineReady(nodeId)
     }
@@ -68,6 +72,32 @@ private class DepthsProcessor(bMatrixWriter: BMatrixWriter, distanceMatrixWriter
   def counters = underlyingMap
 }
 
+class Task(graph: DirectedGraph[Node], bMatrixWriter: BMatrixWriter, distanceMatrixWriter: MatrixWriter, node: Node, log: Logger, progress: Progress, outFileNamePrefix: String) extends Runnable {
+  def run() {
+    //BEWARE Exceptions are silenced!
+    //graph.par.foreach { node =>
+    //printf("Starting calculation for node %d\n", node.id)
+    val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
+    //We traverse the graph to get depths
+    bfs.foreach(_ => {})
+//    try {
+    val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
+    depthProcessor.processDepths(node.id, bfs.depthAllNodes())
+//    } catch {
+//      case e: Exception => {
+//        log.info(e.getClass.toString)
+//        log.info(e.toString)
+//
+//        println(e.getClass)
+//        e.printStackTrace()
+//      }
+//    }
+    //Should be synchronized, but we don't care that much, it's just for debug.
+    printf("Finished calculation for node %d\n", node.id)
+    progress.inc
+  }
+}
+
 private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
   private val log = Logger.get("BMatrixCalculation")
@@ -78,42 +108,64 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run(outFileNamePrefix: String): Unit = {
+  def run(outFileNamePrefix: String, writeDistanceMatrix: Boolean, threads: Int): Unit = {
     // Let the user know if they can save memory!
-    if (graph.maxNodeId.toDouble != graph.nodeCount)
-      log.info("Warning - you may be able to reduce the memory usage of PageRank by renumbering this graph!")
+    if (graph.maxNodeId != graph.nodeCount - 1)
+      log.info("Warning - you may be able to reduce the memory usage by renumbering this graph!")
 
-    val progress = Progress("BMatrix_calculation", 5000, Some(graph.nodeCount))
+    val progress = Progress("BMatrix_calculation", 500, Some(graph.nodeCount))
     setDebug()
 
-
     log.info("Initializing BMatix calculation...\n")
+    if (writeDistanceMatrix) {
+      log.info("Writing distance matrix.")
+    }
+    log.info("Using %d threads.".format(threads))
+
     val watch = Stopwatch.start()
     val bMatrixWriter = new BMatrixWriter()
-    val distanceMatrixWriter = new DistanceMatrixWriter(graph, outFileNamePrefix)
 
-    graph.par.foreach { node =>
-      val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-      val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
-      //We traverse the graph to get depths
-      bfs.foreach(x => {})
+    val distanceMatrixWriter: MatrixWriter = if (writeDistanceMatrix)
+      new DistanceMatrixWriter(graph, outFileNamePrefix)
+    else
+      new NullDistanceMatrixWriter()
 
-      depthProcessor.processDepths(node.id, bfs.depthAllNodes())
+    val threadPool = new ExecutionContext {
+      val threadPool = Executors.newFixedThreadPool(threads)
 
-      //Should be synchronized, but we don't care that much, it's just for debug.
-      progress.inc
+      def execute(runnable: Runnable) {
+        threadPool.submit(runnable)
+      }
+
+      def reportFailure(t: Throwable): Unit = {
+        log.error(t.getMessage)
+      }
+
+      def shutdown = {
+        threadPool.shutdown
+      }
+
+      def isTerminated = {
+        threadPool.isTerminated
+      }
     }
+
+    graph.foreach { node =>
+      threadPool.execute(new Task(graph, bMatrixWriter, distanceMatrixWriter, node, log, progress, outFileNamePrefix))
+    }
+
+    threadPool.shutdown
+    while (!threadPool.isTerminated) {
+      Thread.sleep(500)
+    }
+
     distanceMatrixWriter.close()
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
 
     log.info("Initializing BMatrix writing\n")
     val writingWatch = Stopwatch.start()
-    bMatrixWriter.printMatrix()
-    log.info("Finished BMatrix writing time: %s\n".format(writingWatch()))
-    log.info("Initializing BMatrix writing\n")
-    val writingWatch2 = Stopwatch.start()
     bMatrixWriter.writeMatrix(outFileNamePrefix)
-    log.info("Finished BMatrix writing time: %s\n".format(writingWatch2()))
+    log.info("Finished BMatrix writing time: %s\n".format(writingWatch()))
 
   }
 }

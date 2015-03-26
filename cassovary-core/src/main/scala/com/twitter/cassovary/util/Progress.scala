@@ -33,7 +33,9 @@ class Progress(val name: String, val interval: Int, val maxValue: Option[Int]) {
 
   private val log = Logger.get("Progress of: " + name)
 
+  val mb = 1024 * 1024
   var count = 0
+  val runtime = Runtime.getRuntime()
 
   /**
    * Increment Progress counter
@@ -41,11 +43,21 @@ class Progress(val name: String, val interval: Int, val maxValue: Option[Int]) {
   def inc {
     count += 1
     if (count % interval == 0) {
+      val memoryInfo = " Used Memory:%d MB, Free Memory:%d MB, Total Memory:%d MB, Max Memory:%d MB".format(
+        (runtime.totalMemory() - runtime.freeMemory()) / mb,
+        runtime.freeMemory() / mb,
+        runtime.totalMemory() / mb,
+        runtime.maxMemory() / mb
+      )
+
       maxValue match {
-        case Some(max) => log.debug("%s (%.2f%%)".format(count, count.toDouble / max * 100))
-        case None => log.debug(count.toString)
+        case Some(max) => {
+          log.debug("%s (%.2f%%)%s".format(count, count.toDouble / max * 100, memoryInfo))
+        }
+        case None => {
+          log.debug(count.toString + memoryInfo)
+        }
       }
     }
   }
-
 }
