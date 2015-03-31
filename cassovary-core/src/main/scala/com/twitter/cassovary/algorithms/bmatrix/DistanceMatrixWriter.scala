@@ -39,12 +39,10 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
   private val offsets = new Array[Int](graph.maxNodeId + 1)
   private val fout = new FileOutputStream(filename(OutFileNamePrefix))
   private val out = fout.getChannel
-  private val tab = "\t".getBytes
-  private val newline = "\n".getBytes
   private val maxId = graph.maxNodeId
   private val nodesNumber = graph.nodeCount
   private var lastWrittenId = 0
-  private var lastLog = 0
+
 
   val nodeIds = 0 until maxId
   nodeIds.foreach(id => {
@@ -104,13 +102,7 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
 
   private def writeLine(buffer: ByteBuffer) = {
     buffer.rewind()
-    //val range = 0 until nodesNumber
-    //range.foreach({x => println("aa" + x.toString()); println(buffer.getInt(x * 4))})
     out.write(buffer)
-//    if(lastLog % 500 == 0) {
-//      printf("Last written line:%d, map size: %d \n", lastWrittenId, underlyingMap.size)
-//    }
-//    lastLog += 1
   }
 
   def filename(OutFileNamePrefix: String) = {

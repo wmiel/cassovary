@@ -13,7 +13,7 @@
  */
 package com.twitter.cassovary
 
-import com.twitter.cassovary.algorithms.bmatrix.{BMatrixWriter, BMatrixCalculation}
+import com.twitter.cassovary.algorithms.bmatrix._
 import com.twitter.cassovary.graph.{DirectedGraph, Node}
 import com.twitter.util.Stopwatch
 
@@ -22,6 +22,21 @@ class BMatrixBenchmark(graph: DirectedGraph[Node], outFileNamePrefix: String, wr
   extends OperationBenchmark {
 
   def operation() {
-    BMatrixCalculation(graph, outFileNamePrefix, writeDistanceMatrix, threads)
+    if (writeDistanceMatrix) {
+      println("Writing distance matrix.")
+    }
+    printf("Using %d threads.", threads)
+
+    val distanceMatrixWriter: MatrixWriter = if (writeDistanceMatrix)
+      new DistanceMatrixWriter(graph, outFileNamePrefix)
+    else
+      new NullDistanceMatrixWriter()
+
+    val bmatrix = BMatrixCalculation(graph, distanceMatrixWriter, threads)
+    println("Initializing BMatrix writing")
+    val writingWatch = Stopwatch.start()
+
+    bmatrix.writeMatrix(outFileNamePrefix)
+    printf("Finished BMatrix writing time: %s\n", writingWatch())
   }
 }
