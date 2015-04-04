@@ -1,9 +1,11 @@
 package com.twitter.cassovary.algorithms.bmatrix
 
 import java.io.FileOutputStream
+import java.nio.channels.Channels
 import java.nio.{ByteBuffer, IntBuffer}
 import java.util
 import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.GZIPOutputStream
 
 import com.twitter.cassovary.graph._
 import it.unimi.dsi.fastutil.ints.{Int2BooleanOpenHashMap, Int2ObjectOpenHashMap}
@@ -38,7 +40,8 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
   protected val missingNodeIds = new Int2BooleanOpenHashMap
   private val offsets = new Array[Int](graph.maxNodeId + 1)
   private val fout = new FileOutputStream(filename(OutFileNamePrefix))
-  private val out = fout.getChannel
+  private val gzip = new GZIPOutputStream(fout)
+  private val out = Channels.newChannel(gzip)
   private val maxId = graph.maxNodeId
   private val nodesNumber = graph.nodeCount
   private var lastWrittenId = 0
@@ -106,10 +109,12 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
   }
 
   def filename(OutFileNamePrefix: String) = {
-    OutFileNamePrefix + "_distances.out"
+    OutFileNamePrefix + "_distances.out.gz"
   }
 
   def close() = {
+    gzip.finish()
+    gzip.close()
     out.close()
     fout.close()
   }
