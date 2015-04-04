@@ -49,7 +49,7 @@ trait GraphReader[T] {
   /**
    * Override to modify the graph's stored direction
    */
-  def storedGraphDir: StoredGraphDir = StoredGraphDir.OnlyOut
+  def storedGraphDir: StoredGraphDir = StoredGraphDir.BothInOut
 
   /**
    * Override to use multiple threads

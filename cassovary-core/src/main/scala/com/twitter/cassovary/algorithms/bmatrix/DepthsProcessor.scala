@@ -16,6 +16,10 @@ trait DepthsProcessor {
   }
 
   def incrementForDepth(depth: Int) = {
-    underlyingMap.addTo(depth, 1)
+    addTo(depth, 1)
+  }
+
+  def addTo(bucket: Int, value: Int) = {
+    underlyingMap.addTo(bucket, value)
   }
 }

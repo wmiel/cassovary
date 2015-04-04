@@ -22,55 +22,55 @@ import java.io.File
 import scala.collection.mutable.ListBuffer
 
 /**
- * Performance test.
- *
- * Performs PageRank and Personalized PageRank algorithms
- * on several real life graphs from http://snap.stanford.edu/data/. Two small
- * graphs are stored under resources, you can benchmark on larger graphs
- * by providing additional graph urls (they will be downloaded).
- *
- * Usage:
- *   PerformanceBenchmark -h
- * to get started.
- *
- * Example Usages:
- * -local=facebook -globalpr
- * Benchmarks global pagerank on the local facebook graph
- *
- * -url=http://snap.stanford.edu/data/cit-HepTh.txt.gz -ppr
- * Downloads the graph from that URL into local subdir cache/ and runs personalized pagerank on it
- *
- * By default runs every test 10 times and reports average time taken.
- *
- * See: [[http://snap.stanford.edu/data/]]
- */
+  * Performance test.
+  *
+  * Performs PageRank and Personalized PageRank algorithms
+  * on several real life graphs from http://snap.stanford.edu/data/. Two small
+  * graphs are stored under resources, you can benchmark on larger graphs
+  * by providing additional graph urls (they will be downloaded).
+  *
+  * Usage:
+  * PerformanceBenchmark -h
+  * to get started.
+  *
+  * Example Usages:
+  * -local=facebook -globalpr
+  * Benchmarks global pagerank on the local facebook graph
+  *
+  * -url=http://snap.stanford.edu/data/cit-HepTh.txt.gz -ppr
+  * Downloads the graph from that URL into local subdir cache/ and runs personalized pagerank on it
+  *
+  * By default runs every test 10 times and reports average time taken.
+  *
+  * See: [[http://snap.stanford.edu/data/]]
+  */
 
 object PerformanceBenchmark extends App with GzipGraphDownloader {
   /**
-   * Directory to store cached graphs downloaded from the web.
-   */
+    * Directory to store cached graphs downloaded from the web.
+    */
   val CACHE_DIRECTORY = "cache/"
 
   /**
-   * Path to the directory storing small graphs.
-   */
+    * Path to the directory storing small graphs.
+    */
   val SMALL_FILES_DIRECTORY = "src/main/resources/graphs"
 
   /**
-   * Files to be benchmarked as a list of (directory, name) pairs.
-   */
+    * Files to be benchmarked as a list of (directory, name) pairs.
+    */
   val files = ListBuffer[(String, String)]()
 
   lazy val smallFiles = List((SMALL_FILES_DIRECTORY, "facebook"), (SMALL_FILES_DIRECTORY, "wiki-Vote"))
 
   /**
-   * Builders of algorithms to be benchmarked.
-   */
+    * Builders of algorithms to be benchmarked.
+    */
   val benchmarks = ListBuffer[(DirectedGraph[Node] => OperationBenchmark)]()
 
   /**
-   * Number of repeats of every benchmark.
-   */
+    * Number of repeats of every benchmark.
+    */
   val DEFAULT_REPS = 10
   val defaultLocalGraphFile = "facebook"
   val DEFAULT_CENTRALITY_ALGORITHM = "all"
@@ -84,6 +84,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val helpFlag = flags("h", false, "Print usage")
   val globalPRFlag = flags("globalpr", false, "run global pagerank benchmark")
   val pprFlag = flags("ppr", false, "run personalized pagerank benchmark")
+  val accFlag = flags("acc", false, "run average clustering coefficient benchmark")
   val centFlag = flags("c", DEFAULT_CENTRALITY_ALGORITHM,
     "run the specified centrality algorithm (indegree, outdegree, closeness, all)")
   val getNodeFlag = flags("gn", 0, "run getNodeById benchmark with a given number of steps")
@@ -92,8 +93,9 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val numberOfPartitions = flags("numberOfPartitions", 1, "number of partitions")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
+  val ccbMatrixBins = flags("ccBMatrixBins", 0, "number of bins for ccMatrix")
   // val distanceMatrixFlag = flags("writeDistance", false, "write distance matrix to a file. Works only if bmatrix flag is set.")
-  val bmatrixThreadsFlag = flags("bmatrixThreads", 4, "bmatrix threads output file prefix")
+  val bmatrixThreadsFlag = flags("bmatrixThreads", 4, "bmatrix threads")
   val undirectedFlag = flags("undirected", false, "treat graph as undirected")
 
   flags.parseArgs(args)
@@ -103,15 +105,22 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     println("No files specified on command line. Taking default graph files facebook and wiki-Vote.")
     files ++= smallFiles
   }
-  if (globalPRFlag()) { benchmarks += (g => new PageRankBenchmark(g)) }
-  if (pprFlag()) { benchmarks += (g => new PersonalizedPageRankBenchmark(g)) }
+  if (globalPRFlag()) {
+    benchmarks += (g => new PageRankBenchmark(g))
+  }
+  if (pprFlag()) {
+    benchmarks += (g => new PersonalizedPageRankBenchmark(g))
+  }
   if (bMatrixFlag.isDefined) {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions(), ccbMatrixBins()))
       }
     }
+  }
+  if (accFlag()) {
+    benchmarks += (g => new AverageClusteringCoefficientBenchmark(g))
   }
 
   if (centFlag.isDefined) {
@@ -126,24 +135,25 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   }
 
 
-  if (getNodeFlag() > 0) { benchmarks += (g => new GetNodeByIdBenchmark(g, getNodeFlag(),
-    GraphDir.OutDir))}
+  if (getNodeFlag() > 0) {
+    benchmarks += (g => new GetNodeByIdBenchmark(g, getNodeFlag(),
+      GraphDir.OutDir))
+  }
   if (helpFlag()) {
     println(flags.usage)
   } else {
     /**
-     * Thread pool used for reading graphs. Only useful if multiple files with the same prefix name are present.
-     */
+      * Thread pool used for reading graphs. Only useful if multiple files with the same prefix name are present.
+      */
     val graphReadingThreadPool = Executors.newFixedThreadPool(4)
 
-    def readGraph(path : String, filename : String, adjacencyList: Boolean) : DirectedGraph[Node] = {
+    def readGraph(path: String, filename: String, adjacencyList: Boolean): DirectedGraph[Node] = {
       if (adjacencyList) {
         AdjacencyListGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
-      } else
-        if(undirectedFlag())
-          ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
-        else
-          ListOfEdgesGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+      } else if (undirectedFlag())
+        ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+      else
+        ListOfEdgesGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
     }
 
     if (benchmarks.isEmpty) {
@@ -156,7 +166,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
         val readingTime = Stopwatch.start()
         val graph = readGraph(path, filename, adjacencyList())
         printf("\tGraph %s loaded from list of edges with %s nodes and %s edges.\n" +
-               "\tLoading Time: %s\n", filename, graph.nodeCount, graph.edgeCount, readingTime())
+          "\tLoading Time: %s\n", filename, graph.nodeCount, graph.edgeCount, readingTime())
         for (b <- benchmarks) {
           val benchmark = b(graph)
           printf("Running benchmark %s on graph %s...\n", benchmark.name, filename)
@@ -167,11 +177,11 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     graphReadingThreadPool.shutdown()
   }
 
-  def cacheRemoteFile(url : String) : (String, String) = {
+  def cacheRemoteFile(url: String): (String, String) = {
     printf("Downloading remote file from %s\n", url)
     new File(CACHE_DIRECTORY).mkdirs()
     val name = url.split("/").last.split("\\.")(0) + ".txt"
-    val target =  CACHE_DIRECTORY + name
+    val target = CACHE_DIRECTORY + name
     downloadAndUnpack(url, target)
     (CACHE_DIRECTORY, name)
   }

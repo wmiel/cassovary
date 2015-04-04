@@ -3,8 +3,8 @@ package com.twitter.cassovary.algorithms.bmatrix
 import com.twitter.cassovary.graph.DirectedGraph
 import com.twitter.cassovary.graph._
 
-private class EdgeDepthsProcessor(edgeBMatrix: HashBasedSparseMatrix) extends DepthsProcessor {
-  var bmatrix = edgeBMatrix
+private class EdgeDepthsProcessor(matrix: HashBasedSparseMatrix) extends DepthsProcessor {
+  var bmatrix = matrix
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int], graph: DirectedGraph[Node], undirectedFlag: Boolean) = {
     graph.foreach(node => {

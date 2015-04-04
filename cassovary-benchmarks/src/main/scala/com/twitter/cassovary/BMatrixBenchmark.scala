@@ -24,7 +24,8 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
                        threads: Int,
                        undirectedFlag: Boolean,
                        partition: Int,
-                       numberOfPartitions: Int
+                       numberOfPartitions: Int,
+                       ccBMatrixBins: Int
                       )
   extends OperationBenchmark {
 
@@ -39,11 +40,6 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
     else
       new NullDistanceMatrixWriter()
 
-    val writers = BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions)
-    println("Initializing BMatrix writing")
-    val writingWatch = Stopwatch.start()
-    writers._1.writeToFile(outFileNamePrefix)
-    writers._2.writeToFile(outFileNamePrefix)
-    printf("Finished BMatrix writing time: %s\n", writingWatch())
+    BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix, ccBMatrixBins)
   }
 }
