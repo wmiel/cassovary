@@ -61,6 +61,7 @@ private class DepthsProcessor(bMatrixWriter: BMatrix, distanceMatrixWriter: Matr
       val entry = iterator.next
       bMatrixWriter.synchronized {
         bMatrixWriter.increment(entry.getKey, entry.getValue)
+        bMatrixWriter.addDistance(entry.getKey, entry.getValue)
       }
     }
   }
@@ -104,6 +105,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
     val watch = Stopwatch.start()
     val bMatrixWriter = new BMatrix()
+    bMatrixWriter.setNodeCount(graph.nodeCount)
     log.info("Initializing BMatix calculation...\n")
 
     //TODO: change to blocking threadpool, remove dependencies
