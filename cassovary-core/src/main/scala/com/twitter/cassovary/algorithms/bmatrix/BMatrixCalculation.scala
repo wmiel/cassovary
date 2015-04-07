@@ -77,8 +77,16 @@ private class Task(graph: DirectedGraph[Node], bMatrixWriter: BMatrix, distanceM
     val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
     //We traverse the graph to get depths
     bfs.foreach(_ => {})
-    val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
-    depthProcessor.processDepths(node.id, bfs.depthAllNodes())
+    try {
+      val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
+      depthProcessor.processDepths(node.id, bfs.depthAllNodes())
+    } catch {
+      case e: Exception => {
+        e.printStackTrace()
+        log.info(e.toString)
+        println(e.toString)
+      }
+    }
     //Should be synchronized, but we don't care that much, it's just for debug.
     printf("Finished calculation for node %d\n", node.id)
     progress.inc

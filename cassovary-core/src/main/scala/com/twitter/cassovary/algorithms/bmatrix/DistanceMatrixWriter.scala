@@ -114,8 +114,8 @@ class DistanceMatrixWriter(graph: DirectedGraph[Node], OutFileNamePrefix: String
 
   def close() = {
     gzip.finish()
-    gzip.close()
     out.close()
+    gzip.close()
     fout.close()
   }
 }

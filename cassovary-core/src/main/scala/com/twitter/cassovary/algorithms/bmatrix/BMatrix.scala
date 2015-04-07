@@ -5,8 +5,8 @@ import java.util
 import it.unimi.dsi.fastutil.ints.{Int2IntOpenHashMap, Int2ObjectOpenHashMap}
 
 class BMatrix extends HashBasedSparseMatrix with FileWriter {
-  private var nodeCount:Int = 0
-  private var sumOfDistances: BigInt = 0
+  private var nodeCount: Int = 0
+  private var averageShortestPath: Double = 0.0
   private var numberOfNodes: Int = 0
   private var efficiency: Double = 0.0
 
@@ -20,7 +20,7 @@ class BMatrix extends HashBasedSparseMatrix with FileWriter {
       val keys2 = map.keySet().toIntArray.sorted
       keys2.foreach(key2 => {
         val value = map.get(key2)
-        if(key == 1)
+        if (key == 1)
           numberOfNodes += value
         func("%d\t%d\t%d\n".format(key, key2, value))
 
@@ -28,27 +28,23 @@ class BMatrix extends HashBasedSparseMatrix with FileWriter {
     })
 
     func("#number of nodes: %d\n".format(numberOfNodes))
+    func("#efficiency: %f\n".format(efficiency))
     func("#average shortest path (assuming zero for disconnected nodes): %f\n".format(averageShortestPath))
-    func("#efficiency: %f\n".format(getEfficiency))
     func("#B-Matrix END\n")
   }
 
-  def setNodeCount(nodeCount:Int) = {
+  def setNodeCount(nodeCount: Int) = {
     this.nodeCount = nodeCount
   }
 
-  def addDistance(distance:Int, numberOfNodes:Int) = {
-    sumOfDistances += distance * numberOfNodes
-    efficiency += (numberOfNodes.toDouble / distance)
+  def addDistance(distance: Int, numberOfNodes: Int) = {
+    val partialShortestPath:Double = distance * numberOfNodes
+    val partialEfficiency:Double = (numberOfNodes.toDouble / distance)
+
+    averageShortestPath += (partialShortestPath / nodeCount.toDouble) / (nodeCount - 1)
+    efficiency += (partialEfficiency / nodeCount) / (nodeCount - 1)
   }
 
-  def averageShortestPath:Double = {
-    sumOfDistances.doubleValue() / (nodeCount * (nodeCount - 1))
-  }
-
-  def getEfficiency:Double = {
-    efficiency / (nodeCount * (nodeCount - 1))
-  }
 
   def filename(OutFileNamePrefix: String) = {
     OutFileNamePrefix + "_bmatrix.out"
