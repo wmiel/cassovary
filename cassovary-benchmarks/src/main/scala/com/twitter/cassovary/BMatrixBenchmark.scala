@@ -32,11 +32,12 @@ class BMatrixBenchmark(graph: DirectedGraph[Node], outFileNamePrefix: String, wr
     else
       new NullDistanceMatrixWriter()
 
-    val bmatrix = BMatrixCalculation(graph, distanceMatrixWriter, threads)
+    val writers = BMatrixCalculation(graph, distanceMatrixWriter, threads)
     println("Initializing BMatrix writing")
     val writingWatch = Stopwatch.start()
-
-    bmatrix.writeMatrix(outFileNamePrefix)
+    writers._1.writeToFile(outFileNamePrefix)
+    writers._2.writeToFile(outFileNamePrefix)
+    writers._3.writeToFile(outFileNamePrefix)
     printf("Finished BMatrix writing time: %s\n", writingWatch())
   }
 }

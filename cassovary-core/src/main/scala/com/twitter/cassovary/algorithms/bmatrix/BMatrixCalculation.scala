@@ -24,53 +24,16 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import scala.concurrent.ExecutionContext
 
 object BMatrixCalculation {
-  def apply(graph: DirectedGraph[Node], distanceMatrixWriter: MatrixWriter, threads: Int): BMatrix = {
+  def apply(graph: DirectedGraph[Node], distanceMatrixWriter: MatrixWriter,
+            threads: Int): (FileWriter, FileWriter, FileWriter) = {
     val bm = new BMatrixCalculation(graph)
     bm.run(distanceMatrixWriter, threads)
   }
 }
 
-private class DepthsProcessor(bMatrixWriter: BMatrix, distanceMatrixWriter: MatrixWriter) {
-  protected val underlyingMap = new Int2IntOpenHashMap
-
-  def incrementForDepth(degree: Int) = {
-    underlyingMap.addTo(degree, 1)
-  }
-
-  def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
-    val buffer = distanceMatrixWriter.getNewBuffer
-    depths.foreach(key_val => {
-      val nId = key_val._1
-      val depth = key_val._2
-
-      if (depth > 0) {
-        incrementForDepth(depth)
-        distanceMatrixWriter.putInBuffer(buffer, nId, depth)
-      }
-    })
-    distanceMatrixWriter.putBuffer(nodeId, buffer)
-    distanceMatrixWriter.synchronized {
-      distanceMatrixWriter.lineReady(nodeId)
-    }
-    addToBMatrixWriter()
-  }
-
-  private def addToBMatrixWriter() = {
-    val iterator = counters.int2IntEntrySet().iterator()
-    while (iterator.hasNext) {
-      val entry = iterator.next
-      bMatrixWriter.synchronized {
-        bMatrixWriter.increment(entry.getKey, entry.getValue)
-        bMatrixWriter.addDistance(entry.getKey, entry.getValue)
-      }
-    }
-  }
-
-  def counters = underlyingMap
-}
-
 //TODO: change to blocking threadpool, remove dependencies
-private class Task(graph: DirectedGraph[Node], bMatrixWriter: BMatrix, distanceMatrixWriter: MatrixWriter, node: Node, log: Logger, progress: Progress) extends Runnable {
+private class Task(graph: DirectedGraph[Node], vertexBMatrix: BMatrix, edgeBMatrix: BMatrix, statsWriter: StatsWriter,
+                   distanceMatrixWriter: MatrixWriter, node: Node, log: Logger, progress: Progress) extends Runnable {
   def run() {
     //BEWARE Exceptions are silenced!
     //printf("Starting calculation for node %d\n", node.id)
@@ -78,8 +41,11 @@ private class Task(graph: DirectedGraph[Node], bMatrixWriter: BMatrix, distanceM
     //We traverse the graph to get depths
     bfs.foreach(_ => {})
     try {
-      val depthProcessor = new DepthsProcessor(bMatrixWriter, distanceMatrixWriter)
-      depthProcessor.processDepths(node.id, bfs.depthAllNodes())
+      val depths = bfs.depthAllNodes()
+      val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix, distanceMatrixWriter, statsWriter)
+      vertexDepthProcessor.processDepths(node.id, depths)
+      val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix, graph)
+      edgeDepthProcessor.processDepths(node.id, depths)
     } catch {
       case e: Exception => {
         e.printStackTrace()
@@ -103,7 +69,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run(distanceMatrixWriter: MatrixWriter, threads: Int): BMatrix = {
+  def run(distanceMatrixWriter: MatrixWriter, threads: Int): (FileWriter, FileWriter, FileWriter) = {
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
       log.info("Warning - you may be able to reduce the memory usage by renumbering this graph!")
@@ -112,8 +78,10 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     setDebug()
 
     val watch = Stopwatch.start()
-    val bMatrixWriter = new BMatrix()
-    bMatrixWriter.setNodeCount(graph.nodeCount)
+    val vertexBMatrix = new BMatrix("vertex")
+    val edgeBMatrix = new BMatrix("edge")
+    val statsWriter = new StatsWriter(graph.nodeCount)
+
     log.info("Initializing BMatix calculation...\n")
 
     //TODO: change to blocking threadpool, remove dependencies
@@ -138,7 +106,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     }
 
     graph.foreach { node =>
-      threadPool.execute(new Task(graph, bMatrixWriter, distanceMatrixWriter, node, log, progress))
+      threadPool.execute(new Task(graph, vertexBMatrix, edgeBMatrix, statsWriter, distanceMatrixWriter, node, log, progress))
     }
 
     threadPool.shutdown
@@ -148,6 +116,6 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
     distanceMatrixWriter.close()
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
-    bMatrixWriter
+    (vertexBMatrix, edgeBMatrix, statsWriter)
   }
 }

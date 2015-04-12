@@ -5,11 +5,13 @@ import java.io.FileOutputStream
 import it.unimi.dsi.fastutil.io.FastBufferedOutputStream
 
 trait FileWriter {
-  def writeToStdout(entries: ((String) => Unit) => Unit) = {
+  def entries(func: String => Unit)
+
+  def writeToStdout = {
     entries((x: String) => print(x))
   }
 
-  def writeToFile(filename: String, entries: ((String) => Unit) => Unit) = {
+  def writeToFile(filename: String) = {
     val fout = new FileOutputStream(filename)
     val out = new FastBufferedOutputStream(fout)
 
