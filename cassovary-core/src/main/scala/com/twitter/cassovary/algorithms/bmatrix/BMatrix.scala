@@ -28,7 +28,7 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
     func("#B-Matrix END\n")
   }
 
-  def filename(OutFileNamePrefix: String) = {
+  override def filename(OutFileNamePrefix: String) = {
     OutFileNamePrefix + fileNameSuffix + "_bmatrix.out"
   }
 }

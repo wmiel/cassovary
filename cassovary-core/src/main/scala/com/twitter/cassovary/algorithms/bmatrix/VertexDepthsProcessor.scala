@@ -2,7 +2,7 @@ package com.twitter.cassovary.algorithms.bmatrix
 
 private class VertexDepthsProcessor(vertexBMatrix: BMatrix, distanceMatrixWriter: MatrixWriter,
                                     statsWriter: StatsWriter) extends DepthsProcessor {
-  def bmatrix = vertexBMatrix
+  var bmatrix = vertexBMatrix
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
     val buffer = distanceMatrixWriter.getNewBuffer

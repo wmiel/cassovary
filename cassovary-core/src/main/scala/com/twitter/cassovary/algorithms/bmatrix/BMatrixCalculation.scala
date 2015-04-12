@@ -42,8 +42,10 @@ private class Task(graph: DirectedGraph[Node], vertexBMatrix: BMatrix, edgeBMatr
     bfs.foreach(_ => {})
     try {
       val depths = bfs.depthAllNodes()
+
       val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix, distanceMatrixWriter, statsWriter)
       vertexDepthProcessor.processDepths(node.id, depths)
+
       val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix, graph)
       edgeDepthProcessor.processDepths(node.id, depths)
     } catch {

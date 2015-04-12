@@ -17,7 +17,7 @@ class StatsWriter(private val nodeCount:Int) extends FileWriter {
     func("#average shortest path (assuming zero for disconnected nodes): %f\n".format(averageShortestPath))
   }
 
-  def filename(OutFileNamePrefix: String) = {
+  override def filename(OutFileNamePrefix: String) = {
     OutFileNamePrefix + "_stats.out"
   }
 }

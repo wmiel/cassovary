@@ -11,8 +11,8 @@ trait FileWriter {
     entries((x: String) => print(x))
   }
 
-  def writeToFile(filename: String) = {
-    val fout = new FileOutputStream(filename)
+  def writeToFile(prefix: String) = {
+    val fout = new FileOutputStream(filename(prefix))
     val out = new FastBufferedOutputStream(fout)
 
     entries((x: String) => out.write(x.getBytes))
@@ -20,5 +20,9 @@ trait FileWriter {
     out.flush()
     out.close()
     fout.close()
+  }
+
+  def filename(OutFileNamePrefix: String) = {
+    OutFileNamePrefix + getClass
   }
 }
