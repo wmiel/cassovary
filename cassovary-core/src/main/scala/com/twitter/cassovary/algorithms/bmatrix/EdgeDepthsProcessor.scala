@@ -8,7 +8,7 @@ private class EdgeDepthsProcessor(edgeBMatrix: BMatrix, graph: DirectedGraph[Nod
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
     graph.foreach(node => {
-      node.neighborIds(GraphDir.OutDir).foreach({ neighborId => {
+      node.neighborIds(GraphDir.OutDir).toSet.foreach({ neighborId:Int => {
         if (node.id < neighborId && depths.contains(neighborId)) {
           val depth = depths(node.id) + depths(neighborId)
           if (depth > 0) {
