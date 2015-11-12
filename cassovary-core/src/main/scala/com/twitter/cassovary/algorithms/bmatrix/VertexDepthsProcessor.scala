@@ -6,11 +6,22 @@ private class VertexDepthsProcessor(vertexBMatrix: BMatrix, distanceMatrixWriter
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int]) = {
     val buffer = distanceMatrixWriter.getNewBuffer
+
+    var maxDepth:BigInt = 0
+    var sumOfDepths:BigInt = 0
+    var sizeOfCC:BigInt = 1
+
     depths.foreach(key_val => {
       val nId = key_val._1
       val depth = key_val._2
 
       if (depth > 0) {
+        sizeOfCC += 1
+        sumOfDepths += depth
+        if(depth > maxDepth) {
+          maxDepth = depth
+        }
+
         incrementForDepth(depth)
         distanceMatrixWriter.putInBuffer(buffer, nId, depth)
       }
@@ -20,6 +31,9 @@ private class VertexDepthsProcessor(vertexBMatrix: BMatrix, distanceMatrixWriter
       distanceMatrixWriter.lineReady(nodeId)
     }
     addToBMatrix()
+    statsWriter.synchronized {
+      statsWriter.addStats(nodeId, maxDepth, sumOfDepths, sizeOfCC)
+    }
   }
 
   override def processEntry(key: Int, value: Int) = {

@@ -97,7 +97,11 @@ class ListOfEdgesGraphReader[T](
           val internalFromId = nodeNumberer.externalToInternal(idReader(from))
           val internalToId = nodeNumberer.externalToInternal(idReader(to))
           if (edgesBySource.containsKey(internalFromId)) {
-            edgesBySource.get(internalFromId) += internalToId
+            val edges = edgesBySource.get(internalFromId)
+            val disabled = false
+            if(disabled || !edges.contains(internalToId)) {
+              edges += internalToId
+            }
           } else {
             edgesBySource.put(internalFromId, ArrayBuffer(internalToId))
           }
