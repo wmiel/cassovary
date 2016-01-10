@@ -108,7 +108,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, distanceMatrixFlag(), bmatrixThreadsFlag()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, distanceMatrixFlag(), bmatrixThreadsFlag(), undirectedFlag()))
       }
     }
   }

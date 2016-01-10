@@ -25,15 +25,15 @@ import scala.concurrent.ExecutionContext
 
 object BMatrixCalculation {
   def apply(graph: DirectedGraph[Node], distanceMatrixWriter: MatrixWriter,
-            threads: Int): (FileWriter, FileWriter, FileWriter) = {
+            threads: Int, undirectedFlag: Boolean): (FileWriter, FileWriter, FileWriter) = {
     val bm = new BMatrixCalculation(graph)
-    bm.run(distanceMatrixWriter, threads)
+    bm.run(distanceMatrixWriter, threads, undirectedFlag)
   }
 }
 
 //TODO: change to blocking threadpool, remove dependencies
 private class Task(graph: DirectedGraph[Node], vertexBMatrix: BMatrix, edgeBMatrix: BMatrix, statsWriter: StatsWriter,
-                   distanceMatrixWriter: MatrixWriter, node: Node, log: Logger, progress: Progress) extends Runnable {
+                   distanceMatrixWriter: MatrixWriter, node: Node, log: Logger, progress: Progress, undirectedFlag: Boolean) extends Runnable {
   def run() {
     //BEWARE Exceptions are silenced!
     //printf("Starting calculation for node %d\n", node.id)
@@ -47,7 +47,7 @@ private class Task(graph: DirectedGraph[Node], vertexBMatrix: BMatrix, edgeBMatr
       vertexDepthProcessor.processDepths(node.id, depths)
 
       val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix, graph)
-      edgeDepthProcessor.processDepths(node.id, depths)
+      edgeDepthProcessor.processDepths(node.id, depths, undirectedFlag)
     } catch {
       case e: Exception => {
         e.printStackTrace()
@@ -71,7 +71,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run(distanceMatrixWriter: MatrixWriter, threads: Int): (FileWriter, FileWriter, FileWriter) = {
+  def run(distanceMatrixWriter: MatrixWriter, threads: Int, undirectedFlag: Boolean): (FileWriter, FileWriter, FileWriter) = {
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
       log.info("Warning - you may be able to reduce the memory usage by renumbering this graph!")
@@ -108,7 +108,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     }
 
     graph.foreach { node =>
-      threadPool.execute(new Task(graph, vertexBMatrix, edgeBMatrix, statsWriter, distanceMatrixWriter, node, log, progress))
+      threadPool.execute(new Task(graph, vertexBMatrix, edgeBMatrix, statsWriter, distanceMatrixWriter, node, log, progress, undirectedFlag))
     }
 
     threadPool.shutdown
