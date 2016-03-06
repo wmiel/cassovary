@@ -25,9 +25,13 @@ import scala.concurrent.ExecutionContext
 
 object BMatrixCalculation {
   def apply(graph: DirectedGraph[Node], distanceMatrixWriter: MatrixWriter,
-            threads: Int, undirectedFlag: Boolean): (FileWriter, FileWriter, FileWriter) = {
+            threads: Int,
+            undirectedFlag:
+            Boolean,
+            partition: Int,
+            numberOfPartitions: Int): (FileWriter, FileWriter, FileWriter) = {
     val bm = new BMatrixCalculation(graph)
-    bm.run(distanceMatrixWriter, threads, undirectedFlag)
+    bm.run(distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions)
   }
 }
 
@@ -71,18 +75,18 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
   }
 
-  def run(distanceMatrixWriter: MatrixWriter, threads: Int, undirectedFlag: Boolean): (FileWriter, FileWriter, FileWriter) = {
+  def run(distanceMatrixWriter: MatrixWriter,
+          threads: Int,
+          undirectedFlag: Boolean,
+          partition: Int,
+          numberOfPartitions: Int): (FileWriter, FileWriter, FileWriter) = {
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
       log.info("Warning - you may be able to reduce the memory usage by renumbering this graph!")
 
-    val progress = Progress("BMatrix_calculation", 500, Some(graph.nodeCount))
     setDebug()
 
     val watch = Stopwatch.start()
-    val vertexBMatrix = new BMatrix("vertex")
-    val edgeBMatrix = new BMatrix("edge")
-    val statsWriter = new StatsWriter(graph.nodeCount)
 
     log.info("Initializing BMatix calculation...\n")
 
@@ -107,8 +111,23 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
       }
     }
 
+    val perPartition = math.ceil(graph.nodeCount.toDouble / numberOfPartitions).toInt
+    val currentPartitionFrom = (partition - 1) * perPartition
+    val currentPartitionTo = (partition) * perPartition
+    val progress = Progress("BMatrix_calculation", 500, Some(perPartition))
+
+    val vertexBMatrix = new BMatrix("_vertex_bmatrix_%s".format(partition))
+    val edgeBMatrix = new BMatrix("_edge_bmatrix_%s".format(partition))
+    val statsWriter = new StatsWriter(graph.nodeCount, "_stats_%s.out".format(partition))
+
+    log.info("Partition %s/%s".format(partition, numberOfPartitions))
+    log.info("Processing %s vertices from %s to %s.".format(perPartition, currentPartitionFrom, currentPartitionTo))
+    var processedNodes = 0
     graph.foreach { node =>
-      threadPool.execute(new Task(graph, vertexBMatrix, edgeBMatrix, statsWriter, distanceMatrixWriter, node, log, progress, undirectedFlag))
+      if (processedNodes >= currentPartitionFrom && processedNodes < currentPartitionTo) {
+        threadPool.execute(new Task(graph, vertexBMatrix, edgeBMatrix, statsWriter, distanceMatrixWriter, node, log, progress, undirectedFlag))
+      }
+      processedNodes += 1
     }
 
     threadPool.shutdown
@@ -118,6 +137,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
     distanceMatrixWriter.close()
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
+    log.info("Nodes processed: %s\n".format(processedNodes))
     (vertexBMatrix, edgeBMatrix, statsWriter)
   }
 }

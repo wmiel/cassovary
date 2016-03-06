@@ -33,6 +33,6 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
   }
 
   override def filename(OutFileNamePrefix: String) = {
-    OutFileNamePrefix + fileNameSuffix + "_bmatrix.out"
+    OutFileNamePrefix + fileNameSuffix + ".out"
   }
 }

@@ -2,7 +2,7 @@ package com.twitter.cassovary.algorithms.bmatrix
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 
-class StatsWriter(private val nodeCount:Int) extends FileWriter {
+class StatsWriter(private val nodeCount:Int, private val fileNameSuffix:String) extends FileWriter {
   private var averageShortestPath: Double = 0.0
   private var efficiency: Double = 0.0
   private var stats = new Int2ObjectOpenHashMap[Tuple3[BigInt, BigInt, BigInt]]
@@ -34,6 +34,6 @@ class StatsWriter(private val nodeCount:Int) extends FileWriter {
   }
 
   override def filename(OutFileNamePrefix: String) = {
-    OutFileNamePrefix + "_stats.out"
+    OutFileNamePrefix + fileNameSuffix
   }
 }

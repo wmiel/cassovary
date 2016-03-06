@@ -22,7 +22,10 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
                        outFileNamePrefix: String,
                        writeDistanceMatrix: Boolean,
                        threads: Int,
-                       undirectedFlag: Boolean)
+                       undirectedFlag: Boolean,
+                       partition: Int,
+                       numberOfPartitions: Int
+                      )
   extends OperationBenchmark {
 
   def operation() {
@@ -36,7 +39,7 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
     else
       new NullDistanceMatrixWriter()
 
-    val writers = BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag)
+    val writers = BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions)
     println("Initializing BMatrix writing")
     val writingWatch = Stopwatch.start()
     writers._1.writeToFile(outFileNamePrefix)

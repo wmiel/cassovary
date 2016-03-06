@@ -88,6 +88,8 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     "run the specified centrality algorithm (indegree, outdegree, closeness, all)")
   val getNodeFlag = flags("gn", 0, "run getNodeById benchmark with a given number of steps")
   val reps = flags("reps", DEFAULT_REPS, "number of times to run benchmark")
+  val partition = flags("partition", 1, "current partition")
+  val numberOfPartitions = flags("numberOfPartitions", 1, "number of partitions")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
   val distanceMatrixFlag = flags("writeDistance", false, "write distance matrix to a file. Works only if bmatrix flag is set.")
@@ -108,7 +110,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, distanceMatrixFlag(), bmatrixThreadsFlag(), undirectedFlag()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, distanceMatrixFlag(), bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
       }
     }
   }
