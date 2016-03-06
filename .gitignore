@@ -17,5 +17,7 @@ project/idea.properties
 project/plugins/project/
 project/plugins/src_managed/
 sbt-launch.jar
+switch_java.sh
+build.sh
 
 cassovary-benchmarks/cache
