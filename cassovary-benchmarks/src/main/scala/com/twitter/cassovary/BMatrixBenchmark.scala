@@ -44,7 +44,6 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
     val writingWatch = Stopwatch.start()
     writers._1.writeToFile(outFileNamePrefix)
     writers._2.writeToFile(outFileNamePrefix)
-    writers._3.writeToFile(outFileNamePrefix)
     printf("Finished BMatrix writing time: %s\n", writingWatch())
   }
 }

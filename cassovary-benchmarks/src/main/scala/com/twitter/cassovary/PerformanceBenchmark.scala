@@ -92,9 +92,8 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val numberOfPartitions = flags("numberOfPartitions", 1, "number of partitions")
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
-  val distanceMatrixFlag = flags("writeDistance", false, "write distance matrix to a file. Works only if bmatrix flag is set.")
+  // val distanceMatrixFlag = flags("writeDistance", false, "write distance matrix to a file. Works only if bmatrix flag is set.")
   val bmatrixThreadsFlag = flags("bmatrixThreads", 4, "bmatrix threads output file prefix")
-
   val undirectedFlag = flags("undirected", false, "treat graph as undirected")
 
   flags.parseArgs(args)
@@ -110,7 +109,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, distanceMatrixFlag(), bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
       }
     }
   }

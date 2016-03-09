@@ -9,20 +9,20 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
   private var numberOfEdges: Int = 0
 
   override def entries(func: String => Unit) = {
-    func("#l-shell size\tnumber of members in l-shell\tnumber of nodes")
+    func("#l-shell size\tnumber of members in l-shell\tnumber of nodes\n")
     func("#B-Matrix START\n")
 
-    val keys = underlyingMap.keySet().toIntArray.sorted
-    keys.foreach(key => {
-      val map = underlyingMap.get(key)
-      val keys2 = map.keySet().toIntArray.sorted
-      keys2.foreach(key2 => {
-        val value = map.get(key2)
-        if (key == 1) {
-          numberOfNodes += value
-          numberOfEdges += value * key2
+    val shellSizes = underlyingMap.keySet().toIntArray.sorted
+    shellSizes.foreach(shellSize => {
+      val numberOfMembersToNumberOfNodesMap = underlyingMap.get(shellSize)
+      val numbersOfMembers = numberOfMembersToNumberOfNodesMap.keySet().toIntArray.sorted
+      numbersOfMembers.foreach(numberOfMembers => {
+        val NumberOfNodes = numberOfMembersToNumberOfNodesMap.get(numberOfMembers)
+        if (shellSize == 1) {
+          numberOfNodes += NumberOfNodes
+          numberOfEdges += NumberOfNodes * numberOfMembers
         }
-        func("%d\t%d\t%d\n".format(key, key2, value))
+        func("%d\t%d\t%d\n".format(shellSize, numberOfMembers, NumberOfNodes))
 
       })
     })
