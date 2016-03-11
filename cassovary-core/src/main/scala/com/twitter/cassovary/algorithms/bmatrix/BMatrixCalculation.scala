@@ -37,7 +37,7 @@ object BMatrixCalculation {
 
 private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
                       graph: DirectedGraph[Node],
-                      node: Node,
+                      nodes: Seq[Node],
                       log: Logger,
                       progress: Progress,
                       undirectedFlag: Boolean,
@@ -45,32 +45,40 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
                       clusteringCoefficient: Map[Int, (Double, Int)]) extends Runnable {
   def run() {
     //BEWARE Exceptions are silenced!
+    try {
+      val executorThreadName = Thread.currentThread().getName
+      val data = parallelExecutionContext.getData(executorThreadName).get
+      val vertexBMatrix = data(0)
+      val edgeBMatrix = data(1)
 
-    val executorThreadName = Thread.currentThread().getName
-    val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-    //We traverse the graph to get depths
-    bfs.foreach(_ => {})
+      val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
+      val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
 
-    val depths = bfs.depthAllNodes()
 
-    val data = parallelExecutionContext.getData(executorThreadName).get
-    val vertexBMatrix = data(0)
-    val edgeBMatrix = data(1)
+      nodes.foreach { node =>
+        val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
+        //We traverse the graph to get depths
+        bfs.foreach(_ => {})
 
-    val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
-    vertexDepthProcessor.processDepths(node.id, depths)
+        val depths = bfs.depthAllNodes()
+        vertexDepthProcessor.processDepths(node.id, depths)
+        edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
 
-    val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
-    edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
+        if (ccMatrix) {
+          val ccBMatrix = data(2)
+          val ccDepthProcessor = new ClusteringCoefficientDepthsProcessor(ccBMatrix, clusteringCoefficient)
+          ccDepthProcessor.processDepths(node.id, depths)
+        }
 
-    if (ccMatrix) {
-      val ccBMatrix = data(2)
-      val ccDepthProcessor = new ClusteringCoefficientDepthsProcessor(ccBMatrix, clusteringCoefficient)
-      ccDepthProcessor.processDepths(node.id, depths)
+        progress.inc
+      }
+      println("Finished calculation for nodes " + nodes.map(x => x.id).mkString(","))
+    } catch {
+      case e: Exception => {
+        println(e)
+        e.printStackTrace()
+      }
     }
-
-    printf("Finished calculation for node %d\n", node.id)
-    progress.inc
   }
 }
 
@@ -129,11 +137,22 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     log.info("Partition %s/%s".format(partition, numberOfPartitions))
     log.info("Processing %s vertices from %s to %s.".format(perPartition, currentPartitionFrom, currentPartitionTo))
     var processedNodes = 0
+
+    var nodes = List[Node]()
+    val multitaskLimit = 20
     graph.foreach { node =>
       if (processedNodes >= currentPartitionFrom && processedNodes < currentPartitionTo) {
-        threadPool.execute(new BfsTask(threadPool, graph, node, log, progress, undirectedFlag, ccMatrix, localCCs))
+        if (nodes.size < multitaskLimit) {
+          nodes = nodes :+ node
+        } else {
+          threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, ccMatrix, localCCs))
+          nodes = List(node)
+        }
       }
       processedNodes += 1
+    }
+    if (nodes.size > 0) {
+      threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, ccMatrix, localCCs))
     }
 
     threadPool.waitToFinish()
