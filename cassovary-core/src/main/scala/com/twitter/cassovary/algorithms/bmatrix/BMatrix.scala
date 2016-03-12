@@ -5,8 +5,8 @@ import java.util
 import it.unimi.dsi.fastutil.ints.{Int2IntOpenHashMap, Int2ObjectOpenHashMap}
 
 class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWriter {
-  private var numberOfNodes: Int = 0
-  private var numberOfEdges: Int = 0
+  var numberOfNodes: Long = 0
+  var numberOfEdges: Long = 0
 
   override def entries(func: String => Unit) = {
     func("#l-shell size\tnumber of members in l-shell\tnumber of nodes\n")
@@ -18,12 +18,11 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
       val numbersOfMembers = numberOfMembersToNumberOfNodesMap.keySet().toIntArray.sorted
       numbersOfMembers.foreach(numberOfMembers => {
         val NumberOfNodes = numberOfMembersToNumberOfNodesMap.get(numberOfMembers)
-        if (shellSize == 1) {
-          numberOfNodes += NumberOfNodes
-          numberOfEdges += NumberOfNodes * numberOfMembers
-        }
+//        if (shellSize == 1) {
+//          numberOfNodes += NumberOfNodes
+//          numberOfEdges += NumberOfNodes * numberOfMembers
+//        }
         func("%d\t%d\t%d\n".format(shellSize, numberOfMembers, NumberOfNodes))
-
       })
     })
 

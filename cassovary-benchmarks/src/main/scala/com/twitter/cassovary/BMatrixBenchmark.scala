@@ -33,13 +33,10 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
     if (writeDistanceMatrix) {
       println("Writing distance matrix.")
     }
-    printf("Using %d threads.", threads)
-
     val distanceMatrixWriter: MatrixWriter = if (writeDistanceMatrix)
       new DistanceMatrixWriter(graph, outFileNamePrefix)
     else
       new NullDistanceMatrixWriter()
-
     BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix, ccBMatrixBins)
   }
 }

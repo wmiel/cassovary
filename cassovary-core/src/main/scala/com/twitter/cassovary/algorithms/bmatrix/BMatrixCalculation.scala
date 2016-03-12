@@ -48,6 +48,7 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
     try {
       val executorThreadName = Thread.currentThread().getName
       val data = parallelExecutionContext.getData(executorThreadName).get
+
       val vertexBMatrix = data(0)
       val edgeBMatrix = data(1)
 
@@ -75,6 +76,7 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
       printf("Finished calculation in %s for nodes %s\n", executorThreadName, nodes.map(x => x.id).mkString(","))
     } catch {
       case e: Exception => {
+        println("BFS WORKER EXCEPTION")
         println(e)
         e.printStackTrace()
       }
@@ -107,6 +109,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     val watch = Stopwatch.start()
 
     log.info("Initializing BMatix calculation...\n")
+    log.info("Using " + threads + " threads.")
 
 
     val perPartition = math.ceil(graph.nodeCount.toDouble / numberOfPartitions).toInt
@@ -175,7 +178,6 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
     log.info("Nodes processed: %s\n".format(processedNodes))
 
-
     println("Initializing BMatrix writing")
     val writingWatch = Stopwatch.start()
 
@@ -188,6 +190,8 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     }
 
     writers.foreach((x) => {
+      x.numberOfNodes = graph.nodeCount
+      x.numberOfEdges = graph.edgeCount
       x.writeToFile(outFileNamePrefix)
     })
     printf("Finished BMatrix writing time: %s\n", writingWatch())
