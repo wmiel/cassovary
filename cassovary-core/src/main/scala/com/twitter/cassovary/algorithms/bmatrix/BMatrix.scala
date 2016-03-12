@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.ints.{Int2IntOpenHashMap, Int2ObjectOpenHashMap}
 class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWriter {
   var numberOfNodes: Long = 0
   var numberOfEdges: Long = 0
+  var calculationTime: String = ""
 
   override def entries(func: String => Unit) = {
     func("#l-shell size\tnumber of members in l-shell\tnumber of nodes\n")
@@ -28,6 +29,7 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
 
     func("#number of nodes: %d\n".format(numberOfNodes))
     func("#number of edges: %d\n".format(numberOfEdges / 2))
+    func("#calculation time: %s\n".format(calculationTime))
     func("#B-Matrix END\n")
   }
 

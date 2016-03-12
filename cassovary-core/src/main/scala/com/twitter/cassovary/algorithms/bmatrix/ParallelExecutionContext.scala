@@ -19,9 +19,9 @@ class NamedThreadFactory extends ThreadFactory {
   }
 }
 
-class ParallelExecutionContext(val threads: Int, val log: Logger, dataCreator: ()=>Seq[HashBasedSparseMatrix]) extends ExecutionContext {
+class ParallelExecutionContext(val threads: Int, val log: Logger) extends ExecutionContext {
   val threadPool = Executors.newFixedThreadPool(threads, new NamedThreadFactory)
-  val data = new mutable.HashMap[String, Seq[HashBasedSparseMatrix]]
+  val data = Array.fill[Seq[HashBasedSparseMatrix]](threads)(Array.fill(3)(new HashBasedSparseMatrix()))
 
   def execute(runnable: Runnable) {
     threadPool.submit(runnable)
@@ -40,13 +40,9 @@ class ParallelExecutionContext(val threads: Int, val log: Logger, dataCreator: (
     threadPool.isTerminated
   }
 
-  def getData(name: String) = {
-    if (data.contains(name)) {
-      data.get(name)
-    } else {
-      data.put(name, dataCreator())
-    }
-    data.get(name)
+  def getData(name: String): Seq[HashBasedSparseMatrix] = {
+    val index = name.split("_").last.toInt
+    data(index)
   }
 
   def waitToFinish() = {

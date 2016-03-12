@@ -47,10 +47,10 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
     //BEWARE Exceptions are silenced!
     try {
       val executorThreadName = Thread.currentThread().getName
-      val data = parallelExecutionContext.getData(executorThreadName).get
-
+      val data = parallelExecutionContext.getData(executorThreadName)
       val vertexBMatrix = data(0)
       val edgeBMatrix = data(1)
+      val ccBMatrix = data(2)
 
       nodes.foreach { node =>
         val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
@@ -61,16 +61,14 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
 
         val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
         val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
+        val ccDepthProcessor = new ClusteringCoefficientDepthsProcessor(ccBMatrix, clusteringCoefficient)
 
         vertexDepthProcessor.processDepths(node.id, depths)
         edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
 
         if (ccMatrix) {
-          val ccBMatrix = data(2)
-          val ccDepthProcessor = new ClusteringCoefficientDepthsProcessor(ccBMatrix, clusteringCoefficient)
           ccDepthProcessor.processDepths(node.id, depths)
         }
-
         progress.inc
       }
       printf("Finished calculation in %s for nodes %s\n", executorThreadName, nodes.map(x => x.id).mkString(","))
@@ -79,6 +77,8 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
         println("BFS WORKER EXCEPTION")
         println(e)
         e.printStackTrace()
+        val t = Thread.currentThread()
+        t.getUncaughtExceptionHandler.uncaughtException(t, e)
       }
     }
   }
@@ -100,6 +100,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
           numberOfPartitions: Int,
           outFileNamePrefix: String,
           ccBMatrixBins: Int) = {
+    val calculationTime = Stopwatch.start()
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
       log.info("Warning - you may be able to reduce the memory usage by renumbering this graph!")
@@ -118,15 +119,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     val progress = Progress("BMatrix_calculation", 500, Some(perPartition))
 
     val ccMatrix = ccBMatrixBins > 0
-    val threadPool = new ParallelExecutionContext(threads, log, () => {
-      val data = new ArrayBuffer[HashBasedSparseMatrix]
-      data.append(new HashBasedSparseMatrix)
-      data.append(new HashBasedSparseMatrix)
-      if (ccMatrix) {
-        data.append(new HashBasedSparseMatrix)
-      }
-      data
-    })
+    val threadPool = new ParallelExecutionContext(threads, log)
 
     var localCCs: Map[Int, (Double, Int)] = Map()
     if (ccMatrix) {
@@ -165,14 +158,15 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     val edgeBMatrix = new BMatrix("_edge_bmatrix_%s".format(partition))
     val ccBMatrix = new BMatrix("_cc_bmatrix_%s".format(partition))
 
-    threadPool.data.foreach { case (threadName, partialVertexMatrices) => {
-      vertexBMatrix.merge(partialVertexMatrices(0))
-      edgeBMatrix.merge(partialVertexMatrices(1))
+    val data = threadPool.data
+    for (i <- 0 until data.length) {
+      val partialMatrix = data(i)
+      vertexBMatrix.merge(partialMatrix(0))
+      edgeBMatrix.merge(partialMatrix(1))
       if (ccMatrix) {
-        ccBMatrix.merge(partialVertexMatrices(2))
+        ccBMatrix.merge(partialMatrix(2))
       }
-      println(threadName + "results merged.")
-    }
+      printf("BFS_worker_%d results merged.\n", i)
     }
 
     log.info("Finished BMatrix calculation . Time: %s\n".format(watch()))
@@ -192,8 +186,10 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     writers.foreach((x) => {
       x.numberOfNodes = graph.nodeCount
       x.numberOfEdges = graph.edgeCount
+      x.calculationTime = calculationTime().toString()
       x.writeToFile(outFileNamePrefix)
     })
+
     printf("Finished BMatrix writing time: %s\n", writingWatch())
   }
 }

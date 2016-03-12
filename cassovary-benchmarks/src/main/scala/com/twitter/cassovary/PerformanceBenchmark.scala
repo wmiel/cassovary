@@ -91,6 +91,11 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val reps = flags("reps", DEFAULT_REPS, "number of times to run benchmark")
   val partition = flags("partition", 1, "current partition")
   val numberOfPartitions = flags("numberOfPartitions", 1, "number of partitions")
+
+  val downloadAndUnzipOnlyFlag = flags("downloadAndUnzipOnly", false, "downloads and unzips graph only, prevents from running any other operations")
+  val partitionSeparateCache = flags("partitionSeparateCache", false, "saves graph in partition-specific directory")
+  val useCachedGraph = flags("useCachedGraph", false, "uses previously downloaded graph")
+
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
   val ccbMatrixBins = flags("ccBMatrixBins", 0, "number of bins for ccMatrix")
@@ -99,8 +104,9 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val undirectedFlag = flags("undirected", false, "treat graph as undirected")
 
   flags.parseArgs(args)
+
   if (localFileFlag.isDefined) files += ((SMALL_FILES_DIRECTORY, localFileFlag()))
-  if (remoteFileFlag.isDefined) files += cacheRemoteFile(remoteFileFlag())
+  if (remoteFileFlag.isDefined) files += cacheRemoteFile(remoteFileFlag(), useCachedGraph(), partitionSeparateCache(), partition())
   if (files.isEmpty) {
     println("No files specified on command line. Taking default graph files facebook and wiki-Vote.")
     files ++= smallFiles
@@ -160,29 +166,38 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
       println("No benchmarks specified on command line. Will only read the local graph files.")
     }
 
-    files.foreach {
-      case (path, filename) =>
-        printf("Reading %s graph from %s\n", filename, path)
-        val readingTime = Stopwatch.start()
-        val graph = readGraph(path, filename, adjacencyList())
-        printf("\tGraph %s loaded from list of edges with %s nodes and %s edges.\n" +
-          "\tLoading Time: %s\n", filename, graph.nodeCount, graph.edgeCount, readingTime())
-        for (b <- benchmarks) {
-          val benchmark = b(graph)
-          printf("Running benchmark %s on graph %s...\n", benchmark.name, filename)
-          val duration = benchmark.run(reps())
-          printf("\tAvg time over %d repetitions: %s.\n", reps(), duration)
-        }
+    if (!downloadAndUnzipOnlyFlag()) {
+      files.foreach {
+        case (path, filename) =>
+          printf("Reading %s graph from %s\n", filename, path)
+          val readingTime = Stopwatch.start()
+          val graph = readGraph(path, filename, adjacencyList())
+          printf("\tGraph %s loaded from list of edges with %s nodes and %s edges.\n" +
+            "\tLoading Time: %s\n", filename, graph.nodeCount, graph.edgeCount, readingTime())
+          for (b <- benchmarks) {
+            val benchmark = b(graph)
+            printf("Running benchmark %s on graph %s...\n", benchmark.name, filename)
+            val duration = benchmark.run(reps())
+            printf("\tAvg time over %d repetitions: %s.\n", reps(), duration)
+          }
+      }
+      graphReadingThreadPool.shutdown()
     }
-    graphReadingThreadPool.shutdown()
   }
 
-  def cacheRemoteFile(url: String): (String, String) = {
-    printf("Downloading remote file from %s\n", url)
-    new File(CACHE_DIRECTORY).mkdirs()
+  def cacheRemoteFile(url: String, useCached: Boolean, partitionSeparate: Boolean, partition: Int): (String, String) = {
+    val cacheDirectory = if (partitionSeparate) {
+      CACHE_DIRECTORY + "partition_" + partition.toString() + "/"
+    } else {
+      CACHE_DIRECTORY
+    }
+    printf("Downloading remote file from %s to %s\n", url, cacheDirectory)
+    new File(cacheDirectory).mkdirs()
     val name = url.split("/").last.split("\\.")(0) + ".txt"
-    val target = CACHE_DIRECTORY + name
-    downloadAndUnpack(url, target)
-    (CACHE_DIRECTORY, name)
+    val target = cacheDirectory + name
+    if (!useCached) {
+      downloadAndUnpack(url, target)
+    }
+    (cacheDirectory, name)
   }
 }
