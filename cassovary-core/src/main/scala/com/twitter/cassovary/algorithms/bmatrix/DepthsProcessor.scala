@@ -22,4 +22,8 @@ trait DepthsProcessor {
   def addTo(bucket: Int, value: Int) = {
     underlyingMap.addTo(bucket, value)
   }
+
+  def depths = {
+    underlyingMap.keySet()
+  }
 }

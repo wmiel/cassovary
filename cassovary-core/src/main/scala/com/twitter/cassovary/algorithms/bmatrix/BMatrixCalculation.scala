@@ -27,60 +27,9 @@ object BMatrixCalculation {
             Boolean,
             partition: Int,
             numberOfPartitions: Int,
-            outFileNamePrefix: String,
-            ccBMatrixBins: Int
-           ) = {
+            outFileNamePrefix: String) = {
     val bm = new BMatrixCalculation(graph)
-    bm.run(distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix, ccBMatrixBins)
-  }
-}
-
-private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
-                      graph: DirectedGraph[Node],
-                      nodes: Seq[Node],
-                      log: Logger,
-                      progress: Progress,
-                      undirectedFlag: Boolean,
-                      ccMatrix: Boolean,
-                      clusteringCoefficient: Map[Int, (Double, Int)]) extends Runnable {
-  def run() {
-    //BEWARE Exceptions are silenced!
-    try {
-      val executorThreadName = Thread.currentThread().getName
-      val data = parallelExecutionContext.getData(executorThreadName)
-      val vertexBMatrix = data(0)
-      val edgeBMatrix = data(1)
-      val ccBMatrix = data(2)
-
-      nodes.foreach { node =>
-        val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
-        //We traverse the graph to get depths
-        bfs.foreach(_ => {})
-
-        val depths = bfs.depthAllNodes()
-
-        val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
-        val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
-        val ccDepthProcessor = new ClusteringCoefficientDepthsProcessor(ccBMatrix, clusteringCoefficient)
-
-        vertexDepthProcessor.processDepths(node.id, depths)
-        edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
-
-        if (ccMatrix) {
-          ccDepthProcessor.processDepths(node.id, depths)
-        }
-        progress.inc
-      }
-      printf("Finished calculation in %s for nodes %s\n", executorThreadName, nodes.map(x => x.id).mkString(","))
-    } catch {
-      case e: Exception => {
-        println("BFS WORKER EXCEPTION")
-        println(e)
-        e.printStackTrace()
-        val t = Thread.currentThread()
-        t.getUncaughtExceptionHandler.uncaughtException(t, e)
-      }
-    }
+    bm.run(distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix)
   }
 }
 
@@ -98,8 +47,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
           undirectedFlag: Boolean,
           partition: Int,
           numberOfPartitions: Int,
-          outFileNamePrefix: String,
-          ccBMatrixBins: Int) = {
+          outFileNamePrefix: String) = {
     val calculationTime = Stopwatch.start()
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
@@ -112,43 +60,34 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     log.info("Initializing BMatix calculation...\n")
     log.info("Using " + threads + " threads.")
 
-
     val perPartition = math.ceil(graph.nodeCount.toDouble / numberOfPartitions).toInt
     val currentPartitionFrom = (partition - 1) * perPartition
     val currentPartitionTo = (partition) * perPartition
-    val progress = Progress("BMatrix_calculation", 500, Some(perPartition))
+    val progress = Progress("BMatrix_calculation", 1000, Some(perPartition))
 
-    val ccMatrix = ccBMatrixBins > 0
     val threadPool = new ParallelExecutionContext(threads, log)
-
-    var localCCs: Map[Int, (Double, Int)] = Map()
-    if (ccMatrix) {
-      log.info("CC bins:" + ccBMatrixBins)
-      log.info("Processing clustering coefficient")
-      localCCs = ClusteringCoefficient(graph, ccBMatrixBins)
-      log.info("Finished processing clustering coefficient")
-    }
-
 
     log.info("Partition %s/%s".format(partition, numberOfPartitions))
     log.info("Processing %s vertices from %s to %s.".format(perPartition, currentPartitionFrom, currentPartitionTo))
     var processedNodes = 0
 
     var nodes = List[Node]()
-    val multitaskLimit = 10
+    val multitaskLimit = 25
+
     graph.foreach { node =>
-      if (processedNodes >= currentPartitionFrom && processedNodes < currentPartitionTo) {
+      if (currentPartitionFrom <= processedNodes && processedNodes < currentPartitionTo) {
         if (nodes.size < multitaskLimit) {
           nodes = nodes :+ node
         } else {
-          threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, ccMatrix, localCCs))
+          threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
           nodes = List(node)
         }
       }
       processedNodes += 1
     }
-    if (nodes.size > 0) {
-      threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, ccMatrix, localCCs))
+
+    if (nodes.nonEmpty) {
+      threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
     }
 
     threadPool.waitToFinish()
@@ -156,16 +95,12 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
 
     val vertexBMatrix = new BMatrix("_vertex_bmatrix_%s".format(partition))
     val edgeBMatrix = new BMatrix("_edge_bmatrix_%s".format(partition))
-    val ccBMatrix = new BMatrix("_cc_bmatrix_%s".format(partition))
 
     val data = threadPool.data
     for (i <- 0 until data.length) {
       val partialMatrix = data(i)
       vertexBMatrix.merge(partialMatrix(0))
       edgeBMatrix.merge(partialMatrix(1))
-      if (ccMatrix) {
-        ccBMatrix.merge(partialMatrix(2))
-      }
       printf("BFS_worker_%d results merged.\n", i)
     }
 
@@ -178,10 +113,6 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     val writers = new ArrayBuffer[BMatrix]
     writers.append(vertexBMatrix)
     writers.append(edgeBMatrix)
-
-    if (ccMatrix) {
-      writers.append(ccBMatrix)
-    }
 
     writers.foreach((x) => {
       x.numberOfNodes = graph.nodeCount

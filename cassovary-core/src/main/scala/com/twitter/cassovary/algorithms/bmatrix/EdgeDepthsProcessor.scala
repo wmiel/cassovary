@@ -8,11 +8,12 @@ private class EdgeDepthsProcessor(matrix: HashBasedSparseMatrix) extends DepthsP
 
   def processDepths(nodeId: Int, depths: collection.Map[Int, Int], graph: DirectedGraph[Node], undirectedFlag: Boolean) = {
     graph.foreach(node => {
-      node.neighborIds(GraphDir.OutDir).toSet.foreach({ neighborId: Int => {
+      node.neighborIds(GraphDir.OutDir).foreach({ neighborId: Int => {
         //        if (depths.contains(neighborId) && depths.contains(node.id)) {
-        if (((undirectedFlag && node.id < neighborId) || (!undirectedFlag))
-          && depths.contains(neighborId) && depths.contains(node.id)) {
-          val depth = depths(node.id) + depths(neighborId)
+        val nodeId = node.id
+        if (((nodeId < neighborId && undirectedFlag) || (!undirectedFlag))
+          && depths.contains(neighborId) && depths.contains(nodeId)) {
+          val depth = depths(nodeId) + depths(neighborId)
           if (depth > 0) {
             incrementForDepth(depth)
           }

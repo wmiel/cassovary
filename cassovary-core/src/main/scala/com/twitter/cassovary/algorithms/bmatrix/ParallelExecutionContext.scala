@@ -21,7 +21,7 @@ class NamedThreadFactory extends ThreadFactory {
 
 class ParallelExecutionContext(val threads: Int, val log: Logger) extends ExecutionContext {
   val threadPool = Executors.newFixedThreadPool(threads, new NamedThreadFactory)
-  val data = Array.fill[Seq[HashBasedSparseMatrix]](threads)(Array.fill(3)(new HashBasedSparseMatrix()))
+  val data = Array.fill[Seq[HashBasedSparseMatrix]](threads)(Array.fill(2)(new HashBasedSparseMatrix()))
 
   def execute(runnable: Runnable) {
     threadPool.submit(runnable)

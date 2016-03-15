@@ -121,7 +121,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions(), ccbMatrixBins()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
       }
     }
   }
@@ -140,7 +140,6 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     }
   }
 
-
   if (getNodeFlag() > 0) {
     benchmarks += (g => new GetNodeByIdBenchmark(g, getNodeFlag(),
       GraphDir.OutDir))
@@ -151,7 +150,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     /**
       * Thread pool used for reading graphs. Only useful if multiple files with the same prefix name are present.
       */
-    val graphReadingThreadPool = Executors.newFixedThreadPool(4)
+    val graphReadingThreadPool = Executors.newFixedThreadPool(6)
 
     def readGraph(path: String, filename: String, adjacencyList: Boolean): DirectedGraph[Node] = {
       if (adjacencyList) {
@@ -191,12 +190,16 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     } else {
       CACHE_DIRECTORY
     }
-    printf("Downloading remote file from %s to %s\n", url, cacheDirectory)
+
     new File(cacheDirectory).mkdirs()
     val name = url.split("/").last.split("\\.")(0) + ".txt"
     val target = cacheDirectory + name
     if (!useCached) {
+      printf("Downloading remote file from %s to %s\n", url, cacheDirectory)
       downloadAndUnpack(url, target)
+    }
+    else {
+      printf("Using cached file from %s\n", cacheDirectory)
     }
     (cacheDirectory, name)
   }
