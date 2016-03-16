@@ -9,6 +9,9 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
   var numberOfEdges: Long = 0
   var calculationTime: String = ""
 
+  var checkedNumberOfNodes: Long = 0
+  var checkedNnumberOfEdges: Long = 0
+
   override def entries(func: String => Unit) = {
     func("#l-shell size\tnumber of members in l-shell\tnumber of nodes\n")
     func("#B-Matrix START\n")
@@ -19,16 +22,18 @@ class BMatrix(fileNameSuffix: String) extends HashBasedSparseMatrix with FileWri
       val numbersOfMembers = numberOfMembersToNumberOfNodesMap.keySet().toIntArray.sorted
       numbersOfMembers.foreach(numberOfMembers => {
         val NumberOfNodes = numberOfMembersToNumberOfNodesMap.get(numberOfMembers)
-//        if (shellSize == 1) {
-//          numberOfNodes += NumberOfNodes
-//          numberOfEdges += NumberOfNodes * numberOfMembers
-//        }
+        if (shellSize == 1) {
+          checkedNumberOfNodes += NumberOfNodes
+          checkedNnumberOfEdges += NumberOfNodes * numberOfMembers
+        }
         func("%d\t%d\t%d\n".format(shellSize, numberOfMembers, NumberOfNodes))
       })
     })
 
     func("#number of nodes: %d\n".format(numberOfNodes))
     func("#number of edges: %d\n".format(numberOfEdges / 2))
+    func("#checked number of nodes: %d\n".format(checkedNumberOfNodes))
+    func("#checked number of edges: %d\n".format(checkedNnumberOfEdges / 2))
     func("#calculation time: %s\n".format(calculationTime))
     func("#B-Matrix END\n")
   }
