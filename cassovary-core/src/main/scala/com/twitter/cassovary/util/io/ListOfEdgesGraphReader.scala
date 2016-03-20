@@ -108,6 +108,7 @@ class ListOfEdgesGraphReader[T](
           updateNodeMaxOutEdgeId(internalFromId, internalToId)
         }
 
+        var processed = 0
         lines.foreach {
           line =>
             line.trim match {
@@ -116,6 +117,10 @@ class ListOfEdgesGraphReader[T](
                 processEdge(from, to)
                 if(!directed) {
                   processEdge(to, from)
+                }
+                processed += 1
+                if(processed % 10000 == 0) {
+                  log.info("Processed %s edges", processed)
                 }
               }
             }
