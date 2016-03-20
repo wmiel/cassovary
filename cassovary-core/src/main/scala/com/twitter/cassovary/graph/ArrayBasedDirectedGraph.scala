@@ -99,7 +99,7 @@ object ArrayBasedDirectedGraph {
     storedGraphDir: StoredGraphDir,
     neighborsSortingStrategy: NeighborsSortingStrategy
   ) {
-    private lazy val log = Logger.get()
+    private lazy val log = Logger.get("graph_loading")
     private val statsReceiver = DefaultStatsReceiver
 
     private val emptyArray = Array[Int]()

@@ -64,6 +64,10 @@ class ListOfEdgesGraphReader[T](
 
   private lazy val log = Logger.get
 
+  val topLog = Logger.get("")
+  topLog.setLevel(Logger.DEBUG)
+  topLog.getHandlers().foreach(handler => handler.setLevel(Logger.DEBUG))
+
   protected val separator = "\\s"
 
 

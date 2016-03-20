@@ -128,6 +128,9 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   if (accFlag()) {
     benchmarks += (g => new AverageClusteringCoefficientBenchmark(g))
   }
+  if (ccbMatrixBins() > 0) {
+    benchmarks += (g => new CCBMatrixBenchmark(g, "generated", bmatrixThreadsFlag(), ccbMatrixBins()))
+  }
 
   if (centFlag.isDefined) {
     centFlag() match {
@@ -197,6 +200,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     if (!useCached) {
       printf("Downloading remote file from %s to %s\n", url, cacheDirectory)
       downloadAndUnpack(url, target)
+      printf("Download finished to %s\n", target)
     }
     else {
       printf("Using cached file from %s\n", cacheDirectory)

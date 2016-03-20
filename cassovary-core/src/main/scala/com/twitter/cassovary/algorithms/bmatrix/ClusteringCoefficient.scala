@@ -3,7 +3,7 @@ package com.twitter.cassovary.algorithms.bmatrix
 import com.twitter.cassovary.graph._
 
 class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: Int) {
-  def apply(): Map[Int, (Double, Int)] = {
+  def calculate(): Map[Int, (Double, Int)] = {
     var nodeCnt = 0
     val k = 1
     val localCCs = graph.map {
@@ -33,7 +33,6 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
     val possibleConnections = kNeighbours.size * (kNeighbours.size - 1)
     if (possibleConnections > 0) {
       val cc = actualConnections.sum.toDouble / possibleConnections.toDouble
-      println((node.id, (cc, bucket(cc))))
       (node.id, (cc, bucket(cc)))
     }
     else {
