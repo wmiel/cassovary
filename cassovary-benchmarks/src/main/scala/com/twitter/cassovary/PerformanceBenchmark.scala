@@ -13,12 +13,16 @@
  */
 package com.twitter.cassovary
 
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.util.concurrent.Executors
+
+import com.twitter.app.Flags
 import com.twitter.cassovary.graph._
 import com.twitter.cassovary.util.io.{AdjacencyListGraphReader, ListOfEdgesGraphReader}
-import com.twitter.app.Flags
 import com.twitter.util.Stopwatch
-import java.util.concurrent.Executors
-import java.io.File
+
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -99,9 +103,12 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
   val adjacencyList = flags("a", false, "graph in adjacency list format")
   val bMatrixFlag = flags("bmatrix", "", "bmatrix benchmark output file prefix")
   val ccbMatrixBins = flags("ccBMatrixBins", 0, "number of bins for ccMatrix")
+  val ccbMatrixName = flags("ccBMatrixName", "generated", "ccbmatrix output file prefix")
   // val distanceMatrixFlag = flags("writeDistance", false, "write distance matrix to a file. Works only if bmatrix flag is set.")
   val bmatrixThreadsFlag = flags("bmatrixThreads", 4, "bmatrix threads")
   val undirectedFlag = flags("undirected", false, "treat graph as undirected")
+  val minDegree = flags("minDegree", 0, "minimum degree for bmatrix generation")
+  val maxDegree = flags("maxDegree", 0, "minimum degree for bmatrix generation")
 
   flags.parseArgs(args)
 
@@ -121,7 +128,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     bMatrixFlag() match {
       case "" => {}
       case s: String => {
-        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions()))
+        benchmarks += (g => new BMatrixBenchmark(g, s, false, bmatrixThreadsFlag(), undirectedFlag(), partition(), numberOfPartitions(), (minDegree(), maxDegree())))
       }
     }
   }
@@ -129,7 +136,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     benchmarks += (g => new AverageClusteringCoefficientBenchmark(g))
   }
   if (ccbMatrixBins() > 0) {
-    benchmarks += (g => new CCBMatrixBenchmark(g, "generated", bmatrixThreadsFlag(), ccbMatrixBins()))
+    benchmarks += (g => new CCBMatrixBenchmark(g, ccbMatrixName(), bmatrixThreadsFlag(), ccbMatrixBins()))
   }
 
   if (centFlag.isDefined) {
@@ -153,7 +160,7 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     /**
       * Thread pool used for reading graphs. Only useful if multiple files with the same prefix name are present.
       */
-    val graphReadingThreadPool = Executors.newFixedThreadPool(6)
+    val graphReadingThreadPool = Executors.newFixedThreadPool(4)
 
     def readGraph(path: String, filename: String, adjacencyList: Boolean): DirectedGraph[Node] = {
       if (adjacencyList) {
@@ -169,11 +176,19 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
     }
 
     if (!downloadAndUnzipOnlyFlag()) {
+      val timing = Stopwatch.start()
+
       files.foreach {
         case (path, filename) =>
           printf("Reading %s graph from %s\n", filename, path)
           val readingTime = Stopwatch.start()
           val graph = readGraph(path, filename, adjacencyList())
+
+          val time = readingTime()
+          val lines = "\tfile_name\tnodes\tedges\tloading_time\tloading_time[min]\tloading_time[ns]\n\t%s\t%s\t%s\t%s\t%s\t%s\n".
+            format(filename, graph.nodeCount, graph.edgeCount, time, time.inMinutes, time.inNanoseconds)
+          Files.write(Paths.get(filename + "_loading.csv"), lines.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE)
+
           printf("\tGraph %s loaded from list of edges with %s nodes and %s edges.\n" +
             "\tLoading Time: %s\n", filename, graph.nodeCount, graph.edgeCount, readingTime())
           for (b <- benchmarks) {

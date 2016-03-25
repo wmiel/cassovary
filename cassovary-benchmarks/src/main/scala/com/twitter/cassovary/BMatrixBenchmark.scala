@@ -24,7 +24,8 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
                        threads: Int,
                        undirectedFlag: Boolean,
                        partition: Int,
-                       numberOfPartitions: Int)
+                       numberOfPartitions: Int,
+                       minMaxD: (Int, Int))
   extends OperationBenchmark {
 
   def operation() {
@@ -35,6 +36,6 @@ class BMatrixBenchmark(graph: DirectedGraph[Node],
       new DistanceMatrixWriter(graph, outFileNamePrefix)
     else
       new NullDistanceMatrixWriter()
-    BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix)
+    BMatrixCalculation(graph, distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix, minMaxD)
   }
 }

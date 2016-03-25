@@ -27,9 +27,10 @@ object BMatrixCalculation {
             Boolean,
             partition: Int,
             numberOfPartitions: Int,
-            outFileNamePrefix: String) = {
+            outFileNamePrefix: String,
+            minMaxD: (Int, Int)) = {
     val bm = new BMatrixCalculation(graph)
-    bm.run(distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix)
+    bm.run(distanceMatrixWriter, threads, undirectedFlag, partition, numberOfPartitions, outFileNamePrefix, minMaxD)
   }
 }
 
@@ -47,7 +48,8 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
           undirectedFlag: Boolean,
           partition: Int,
           numberOfPartitions: Int,
-          outFileNamePrefix: String) = {
+          outFileNamePrefix: String,
+          minMaxD: (Int, Int)) = {
     val calculationTime = Stopwatch.start()
     // Let the user know if they can save memory!
     if (graph.maxNodeId != graph.nodeCount - 1)
@@ -74,13 +76,18 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     var nodes = List[Node]()
     val multitaskLimit = 25
 
+    val minD = minMaxD._1
+    val maxD = minMaxD._2
+
     graph.foreach { node =>
       if (currentPartitionFrom <= processedNodes && processedNodes < currentPartitionTo) {
-        if (nodes.size < multitaskLimit) {
-          nodes = nodes :+ node
-        } else {
-          threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
-          nodes = List(node)
+        if(maxD == 0 || (maxD > 0 && minD <= node.neighborCount(GraphDir.OutDir) && node.neighborCount(GraphDir.OutDir) <= maxD)) {
+          if (nodes.size < multitaskLimit) {
+            nodes = nodes :+ node
+          } else {
+            threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
+            nodes = List(node)
+          }
         }
       }
       processedNodes += 1

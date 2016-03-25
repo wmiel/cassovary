@@ -39,29 +39,24 @@ private class CCBMatrixCalculation(graph: DirectedGraph[Node]) {
     log.info("Initializing BMatix calculation...\n")
     //log.info("Using " + threads + " threads.")
 
-    val ccBMatrix = new BMatrix("_cc_bmatrix_")
+    val ccBMatrix = new BMatrix("_cc_bmatrix")
 
+    log.info("Calculating kGraphs")
     val kGraphs = new kGraphGenerator(graph)
     //    println("KGRAPHS")
     //    println(kGraphs.kGraphs.mkString(" - "))
-    kGraphs.foreachK { (k, graph) => {
-      val ccs = new ClusteringCoefficient(graph, bins).calculate()
+    kGraphs.kGraphs.par.foreach { case (k: Int, rawGraph: scala.collection.mutable.ListBuffer[NodeIdEdgesMaxId]) => {
+      log.info("Calculating CC for " + k + " in " + Thread.currentThread().getName)
+
+      val g = ArrayBasedDirectedGraph(rawGraph, StoredGraphDir.OnlyOut, NeighborsSortingStrategy.SortWhileReading)
+      log.info(k + "-graph has " + g.nodeCount + " nodes and " + g.edgeCount + " edges.")
+      val ccs = new ClusteringCoefficient(g, bins, k, log).calculate()
       ccs.foreach { case (id, (value, bin)) => {
-        ccBMatrix.addTo(k, bin, 1)
+        ccBMatrix.synchronized {
+          ccBMatrix.addTo(k, bin, 1)
+        }
       }
       }
-
-      //      println(a.mkString("\n"))
-      //      println()
-      //      graph.foreach { node =>
-      //        //var checkedNodes = scala.collection.mutable.Set[Int]()
-      //        node.neighborIds(GraphDir.OutDir).foreach({ neighborId: Int => {
-      //          println(node.id + " - " + neighborId)
-      //        }
-      //        })
-      //      }
-      //      println("======================")
-
     }
     }
 
