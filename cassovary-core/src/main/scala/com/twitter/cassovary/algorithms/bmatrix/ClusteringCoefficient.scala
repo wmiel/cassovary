@@ -1,23 +1,28 @@
 package com.twitter.cassovary.algorithms.bmatrix
 
 import com.twitter.cassovary.graph._
+import com.twitter.logging.Logger
+import scala.collection.Searching._
 
-class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: Int) {
+class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: Int, val k: Int, val log: Logger) {
   def calculate(): Map[Int, (Double, Int)] = {
     var nodeCnt = 0
-    val k = 1
     val localCCs = graph.map {
       node =>
         val neighbourIds = (node.neighborIds(GraphDir.OutDir) ++ node.neighborIds(GraphDir.InDir)).distinct
         nodeCnt += 1
-        calculateForNode(node, neighbourIds, k)
+        val result = calculateForNode(node, neighbourIds, 1)
+        if(nodeCnt % 100 == 0) {
+          log.info("Processed " + nodeCnt + " nodes in " + k + "graph.")
+        }
+        result
     }
 
     val localCCsSum = localCCs.map {
       case (x, (y, z)) => y
     }.sum
-    println("Sum of local CC\tNode count\tNode count verf.\tAverage CC")
-    printf("%f\t%d\t%d\t%f\n", localCCsSum, graph.nodeCount, nodeCnt, localCCsSum / graph.nodeCount)
+    println("k\tSum of local CC\tNode count\tNode count verf.\tAverage CC")
+    printf("%d\t%f\t%d\t%d\t%f\n", k, localCCsSum, graph.nodeCount, nodeCnt, localCCsSum / graph.nodeCount)
     localCCs.toMap
   }
 
@@ -44,9 +49,24 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
     if (k == 1) {
       graph.getNodeById(nodeId1) match {
         case Some(n) =>
-          if (n.isNeighbor(GraphDir.OutDir, nodeId2) || n.isNeighbor(GraphDir.InDir, nodeId2)) {
-            return true
+          //if (n.neighborIds(GraphDir.OutDir).toSet.contains((nodeId2))) {
+          val neighbors = n.neighborIds(GraphDir.OutDir)
+//          println("SEARCHING")
+//          println(neighbors.mkString(" "))
+          neighbors.search(nodeId2) match {
+            case Found(n) => {
+//              println("FOUND " + n)
+              return true
+            }
+            case InsertionPoint(x) => {
+           //   println("Not found")
+              return false
+            }
           }
+//          println(n.isNeighbor(GraphDir.OutDir, nodeId2))
+//          if (n.isNeighbor(GraphDir.OutDir, nodeId2) || n.isNeighbor(GraphDir.InDir, nodeId2)) {
+//            return true
+//          }
         case None => {}
       }
       return false

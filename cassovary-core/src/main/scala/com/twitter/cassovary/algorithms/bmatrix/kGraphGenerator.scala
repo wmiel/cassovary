@@ -8,13 +8,12 @@ import scala.collection.mutable.ListBuffer
 class kGraphGenerator(val graph: DirectedGraph[Node]) {
   val kGraphs = new mutable.HashMap[Int, scala.collection.mutable.ListBuffer[NodeIdEdgesMaxId]]
   var processed = 0
-  graph.foreach { node =>
+  graph.par.foreach { node =>
     val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
     //We traverse the graph to get depths
     bfs.foreach(_ => {})
-
     val kNeighbours = bfs.depthAllNodes().
-      filter { case (nodeId, distance) => distance >= 1 }.
+      filter { case (nodeId, distance) => distance > 1 }.
       groupBy { case (nodeId, distance) => distance }.
       mapValues {
         x => {
@@ -24,25 +23,27 @@ class kGraphGenerator(val graph: DirectedGraph[Node]) {
 
     kNeighbours.foreach { case (k, neighbours) => {
       val ids = NodeIdEdgesMaxId(node.id, neighbours.toArray)
-      if (kGraphs.contains(k)) {
-        kGraphs(k).append(ids)
-      } else {
-        val list = new scala.collection.mutable.ListBuffer[NodeIdEdgesMaxId]
-        list.append(ids)
-        kGraphs(k) = list
+      kGraphs.synchronized {
+        if (kGraphs.contains(k)) {
+          kGraphs(k).append(ids)
+        } else {
+          val list = new scala.collection.mutable.ListBuffer[NodeIdEdgesMaxId]
+          list.append(ids)
+          kGraphs(k) = list
+        }
       }
     }
     }
     processed += 1
-    if (processed % 100 == 0) {
-      println("Processed: " + processed)
+    if (processed % 150 == 0) {
+      println("Processed distances for " + processed + " nodes.")
     }
 
   }
-  println(processed)
+  println("Finished processing distances for: " + processed + " nodes.")
 
   def kGraph(k: Int) = {
-    ArrayBasedDirectedGraph(kGraphs(k), StoredGraphDir.OnlyOut, NeighborsSortingStrategy.LeaveUnsorted)
+    ArrayBasedDirectedGraph(kGraphs(k), StoredGraphDir.OnlyOut, NeighborsSortingStrategy.SortWhileReading)
   }
 
   def foreachK(f: (Int, ArrayBasedDirectedGraph) => Unit) = {
