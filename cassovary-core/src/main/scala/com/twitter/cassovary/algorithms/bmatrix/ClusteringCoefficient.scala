@@ -12,7 +12,7 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
         val neighbourIds = (node.neighborIds(GraphDir.OutDir) ++ node.neighborIds(GraphDir.InDir)).distinct
         nodeCnt += 1
         val result = calculateForNode(node, neighbourIds, 1)
-        if(nodeCnt % 100 == 0) {
+        if (nodeCnt % 100 == 0) {
           log.info("Processed " + nodeCnt + " nodes in " + k + "graph.")
         }
         result
@@ -21,13 +21,13 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
     val localCCsSum = localCCs.map {
       case (x, (y, z)) => y
     }.sum
-    println("k\tSum of local CC\tNode count\tNode count verf.\tAverage CC")
-    printf("%d\t%f\t%d\t%d\t%f\n", k, localCCsSum, graph.nodeCount, nodeCnt, localCCsSum / graph.nodeCount)
+    printf("k\tSum of local CC\tNode count\tNode count verf.\tAverage CC\n%d\t%f\t%d\t%d\t%f\n",
+      k, localCCsSum, graph.nodeCount, nodeCnt, localCCsSum / graph.nodeCount)
     localCCs.toMap
   }
 
   def calculateForNode(node: Node, kNeighbours: Seq[Int], k: Int): (Int, (Double, Int)) = {
-    val nodePairs = for (nodeId1 <- kNeighbours; nodeId2 <- kNeighbours; if nodeId1 != nodeId2) yield (nodeId1, nodeId2)
+    val nodePairs = for (nodeId1 <- kNeighbours; nodeId2 <- kNeighbours; if nodeId1 < nodeId2) yield (nodeId1, nodeId2)
     val actualConnections = nodePairs.map { case (nodeId1, nodeId2) =>
       if (isNeighbour(k, nodeId1, nodeId2)) {
         1
@@ -37,7 +37,7 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
     }
     val possibleConnections = kNeighbours.size * (kNeighbours.size - 1)
     if (possibleConnections > 0) {
-      val cc = actualConnections.sum.toDouble / possibleConnections.toDouble
+      val cc = 2 * actualConnections.sum.toDouble / possibleConnections.toDouble
       (node.id, (cc, bucket(cc)))
     }
     else {
@@ -49,24 +49,15 @@ class ClusteringCoefficient(val graph: DirectedGraph[Node], val ccBMatrixBins: I
     if (k == 1) {
       graph.getNodeById(nodeId1) match {
         case Some(n) =>
-          //if (n.neighborIds(GraphDir.OutDir).toSet.contains((nodeId2))) {
           val neighbors = n.neighborIds(GraphDir.OutDir)
-//          println("SEARCHING")
-//          println(neighbors.mkString(" "))
           neighbors.search(nodeId2) match {
             case Found(n) => {
-//              println("FOUND " + n)
               return true
             }
             case InsertionPoint(x) => {
-           //   println("Not found")
               return false
             }
           }
-//          println(n.isNeighbor(GraphDir.OutDir, nodeId2))
-//          if (n.isNeighbor(GraphDir.OutDir, nodeId2) || n.isNeighbor(GraphDir.InDir, nodeId2)) {
-//            return true
-//          }
         case None => {}
       }
       return false

@@ -14,6 +14,7 @@
 package com.twitter.cassovary.util.io
 
 import com.google.common.util.concurrent.MoreExecutors
+import com.twitter.cassovary.graph.NeighborsSortingStrategy.NeighborsSortingStrategy
 import com.twitter.cassovary.graph.StoredGraphDir.StoredGraphDir
 import com.twitter.cassovary.graph._
 import com.twitter.cassovary.util.NodeNumberer
@@ -61,8 +62,8 @@ trait GraphReader[T] {
   /**
    * Create an `ArrayBasedDirectedGraph`
    */
-  def toArrayBasedDirectedGraph() = {
-    ArrayBasedDirectedGraph(iterableSeq, parallelismLimit, storedGraphDir)
+  def toArrayBasedDirectedGraph(neighborsSortingStrategy: NeighborsSortingStrategy = NeighborsSortingStrategy.LeaveUnsorted) = {
+    ArrayBasedDirectedGraph(iterableSeq, parallelismLimit, storedGraphDir, neighborsSortingStrategy)
   }
 
   /**

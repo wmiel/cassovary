@@ -79,13 +79,15 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     val minD = minMaxD._1
     val maxD = minMaxD._2
 
+    val runBMatrix = true
+
     graph.foreach { node =>
       if (currentPartitionFrom <= processedNodes && processedNodes < currentPartitionTo) {
         if(maxD == 0 || (maxD > 0 && minD <= node.neighborCount(GraphDir.OutDir) && node.neighborCount(GraphDir.OutDir) <= maxD)) {
           if (nodes.size < multitaskLimit) {
             nodes = nodes :+ node
           } else {
-            threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
+            threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, runBMatrix))
             nodes = List(node)
           }
         }
@@ -94,7 +96,7 @@ private class BMatrixCalculation(graph: DirectedGraph[Node]) {
     }
 
     if (nodes.nonEmpty) {
-      threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag))
+      threadPool.execute(new BfsTask(threadPool, graph, nodes, log, progress, undirectedFlag, runBMatrix))
     }
 
     threadPool.waitToFinish()

@@ -166,7 +166,11 @@ object PerformanceBenchmark extends App with GzipGraphDownloader {
       if (adjacencyList) {
         AdjacencyListGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
       } else if (undirectedFlag())
-        ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+        if (ccbMatrixBins() > 0) {
+          ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph(NeighborsSortingStrategy.SortWhileReading)
+        } else {
+          ListOfEdgesGraphReader.forIntIdsUndirected(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
+        }
       else
         ListOfEdgesGraphReader.forIntIds(path, filename, graphReadingThreadPool).toArrayBasedDirectedGraph()
     }

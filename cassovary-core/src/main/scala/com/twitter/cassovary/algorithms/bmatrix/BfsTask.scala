@@ -12,9 +12,9 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
                       nodes: Seq[Node],
                       log: Logger,
                       progress: Progress,
-                      undirectedFlag: Boolean) extends Runnable {
+                      undirectedFlag: Boolean,
+                      runBMatrix: Boolean = true) extends Runnable {
   def run() {
-    //BEWARE Exceptions are silenced!
     try {
       val executorThreadName = Thread.currentThread().getName
       val data = parallelExecutionContext.getData(executorThreadName)
@@ -25,15 +25,15 @@ private class BfsTask(parallelExecutionContext: ParallelExecutionContext,
         val bfs = new BreadthFirstTraverser(graph, GraphDir.OutDir, Seq(node.id), Walk.Limits())
         //We traverse the graph to get depths
         bfs.foreach(_ => {})
+        if (runBMatrix) {
+          val depths = bfs.depthAllNodes()
 
-        val depths = bfs.depthAllNodes()
+          val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
+          val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
 
-        val vertexDepthProcessor = new VertexDepthsProcessor(vertexBMatrix)
-        val edgeDepthProcessor = new EdgeDepthsProcessor(edgeBMatrix)
-
-        vertexDepthProcessor.processDepths(node.id, depths)
-        edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
-
+          vertexDepthProcessor.processDepths(node.id, depths)
+          edgeDepthProcessor.processDepths(node.id, depths, graph, undirectedFlag)
+        }
         progress.inc
       }
       printf("Finished calculation in %s for nodes %s\n", executorThreadName, nodes.map(x => x.id).mkString(","))
